@@ -67,8 +67,21 @@ function cmsf_platforms() {
     return ['WooCommerce', 'WordPress', 'HivePress', 'Joomla', 'Drupal', 'OpenCart', 'PrestaShop', 'Magento', 'Shopify', 'Bitrix', 'DLE', 'CS-Cart', 'Wix', 'Tilda', 'Squarespace', 'Webflow', 'BigCommerce', 'Shopware', 'MODX'];
 }
 
+function cmsf_meta_generators($html) {
+    $values = [];
+    $html = preg_replace('#<!--.*?-->|<(script|style|noscript)\b[^>]*>.*?</\1>#is', ' ', $html);
+    if (!preg_match_all('#<meta\b[^>]*>#i', $html, $tags)) return '';
+    foreach ($tags[0] as $tag) {
+        if (!preg_match('#\bname\s*=\s*(?:"generator"|\'generator\'|generator(?=\s|/?>))#i', $tag)) continue;
+        if (preg_match('#\bcontent\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))#i', $tag, $match)) {
+            $values[] = strtolower(html_entity_decode($match[1] ?: ($match[2] ?: $match[3]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+    }
+    return implode(' ', $values);
+}
+
 function cmsf_is_joomla($h) {
-    if (preg_match('#<meta[^>]+name=["\']generator["\'][^>]+content=["\']joomla#', $h) || preg_match('#<meta[^>]+content=["\']joomla[^>]+name=["\']generator#', $h)) return true;
+    if (strpos(cmsf_meta_generators($h), 'joomla') !== false) return true;
     if (strpos($h, 'joomla-script-options') !== false) return true;
     return (bool)preg_match('#(?:src|href|action)=["\'][^"\']*(?:/media/system/js/|/media/jui/|/media/vendor/joomla|/components/com_[a-z0-9_]+/|index\.php\?option=com_)#', $h);
 }
@@ -81,29 +94,36 @@ function cmsf_detect_cms($html, $headers = '') {
     $markup = preg_replace('#<(script|style|noscript)\b[^>]*>.*?</\1>#is', ' ', $markup);
     $markup = preg_replace('#>([^<]+)<#s', '><', $markup);
     $h = strtolower($markup . "\n" . implode("\n", $scripts) . "\n" . $headers);
-    $wp = preg_match('#wp-content/(?:plugins|themes)/|wp-includes/[^"\'\s>]+|wp-json(?:/|["\' ])|<meta[^>]+name=["\']generator["\'][^>]+wordpress#', $h);
+    $generator = cmsf_meta_generators($h);
+    $wp = strpos($generator, 'wordpress') !== false
+        || strpos($generator, 'woocommerce') !== false
+        || (bool)preg_match('#wp-content/(?:plugins|themes)/|wp-includes/(?:js|css)/|wp-json(?:/|["\' ])|api\.w\.org#', $h);
     if ($wp) {
         if (preg_match('#wp-content/plugins/hivepress/|class=["\'][^"\']*\bhp-(?:listing|vendor|page|form|template)\b#', $h)) return 'HivePress';
-        if (preg_match('#wp-content/plugins/woocommerce/|class=["\'][^"\']*\bwoocommerce(?:-[a-z0-9_-]+)?\b|(?:window\.)?wc_add_to_cart_params|wc-ajax(?:=|["\'])|<meta[^>]+generator[^>]+woocommerce#', $h)) return 'WooCommerce';
+        if (preg_match('#wp-content/plugins/woocommerce/|class=["\'][^"\']*\bwoocommerce(?:-[a-z0-9_-]+)?\b|(?:window\.)?wc_add_to_cart_params|wc-ajax(?:=|["\'])#', $h)
+            || strpos($generator, 'woocommerce') !== false) return 'WooCommerce';
         return 'WordPress';
     }
     if (cmsf_is_joomla($h)) return 'Joomla';
+    if (strpos($generator, 'drupal') !== false) return 'Drupal';
+    if (strpos($generator, 'datalife engine') !== false) return 'DLE';
+    if (strpos($generator, 'modx') !== false) return 'MODX';
     $tests = [
-        ['Drupal', '#drupalsettings|sites/default/files|<meta[^>]+generator[^>]+drupal|/core/misc/drupal#'],
-        ['OpenCart', '#index\.php\?route=|catalog/view/theme#'],
-        ['CS-Cart', '#/design/themes/|tygh\.#'],
-        ['Shopify', '#cdn\.shopify\.com|shopify\.theme|x-shopify#'],
-        ['PrestaShop', '#/modules/ps_#'],
-        ['Magento', '#mage/cookies|static/version\d+/frontend#'],
+        ['Drupal', '#drupalsettings|/(?:core/misc|misc)/drupal(?:\.min)?\.js|/sites/all/modules/#'],
+        ['OpenCart', '#index\.php\?route=product/product|catalog/view/(?:theme|javascript)/#'],
+        ['CS-Cart', '#/design/themes/|/js/tygh/|tygh\.#'],
+        ['Shopify', '#cdn\.shopify\.com|shopify\.theme|x-shopify(?:-|:)|shopify\.routes#'],
+        ['PrestaShop', '#/modules/ps_[a-z0-9_-]+/|prestashop(?:\.|["\'])#'],
+        ['Magento', '#mage/cookies|static/version\d+/frontend/|/static/frontend/[^/]+/[^/]+/[^/]+/[^/]+/magento_#'],
         ['Bitrix', '#/bitrix/(?:js|templates|cache|components)/|bx-core|bitrix/php_interface#'],
-        ['DLE', '#<meta[^>]+generator[^>]+datalife engine|/engine/classes/#'],
-        ['Wix', '#wixstatic\.com|wix\.com#'],
-        ['Squarespace', '#squarespace\.com|static1\.squarespace#'],
-        ['Webflow', '#webflow\.com|website-files\.com#'],
-        ['BigCommerce', '#bigcommerce\.com|cdn\d+\.bigcommerce#'],
-        ['Shopware', '#shopware#'],
-        ['Tilda', '#tildacdn\.com|tilda\.ws#'],
-        ['MODX', '#modx|assets/components/modx#'],
+        ['DLE', '#/engine/classes/|/engine/skins/|dle_root|dle_js#'],
+        ['Wix', '#wixstatic\.com|wixsite\.com|wix-code-sdk#'],
+        ['Squarespace', '#static1\.squarespace\.com|static\.squarespace-cdn\.com|squarespace\.com/static/#'],
+        ['Webflow', '#data-wf-site|webflow\.js|assets\.website-files\.com#'],
+        ['BigCommerce', '#cdn\d+\.bigcommerce\.com|bigcommerce\.com/stencil/|stencil-utils#'],
+        ['Shopware', '#/(?:bundles|themes)/storefront/|shopware\.storefront|shopware\.js#'],
+        ['Tilda', '#tildacdn\.com|data-tilda-|tildacdn#'],
+        ['MODX', '#/assets/components/modx/|modx\.js|<meta[^>]+name=["\']generator["\'][^>]+content=["\']modx#'],
     ];
     foreach ($tests as $t) if (preg_match($t[1], $h)) return $t[0];
     return 'Не визначено';
@@ -126,18 +146,18 @@ function cmsf_detect_version($cms, $base, $html) {
             $v = cmsf_fetch_version($base . $p[0], $p[1]);
             if ($v) return $v;
         }
-        if (preg_match('#<meta[^>]+name=["\']generator["\'][^>]+content=["\']Joomla!?\s*([\d.]+)#i', $html, $m)) return $m[1];
+        if (preg_match('/\bjoomla!?\s*([\d.]+)/i', cmsf_meta_generators($html), $m)) return $m[1];
         return '';
     }
     if (in_array($cms, ['WordPress', 'WooCommerce', 'HivePress'], true)) {
-        if (preg_match('#<meta[^>]+name=["\']generator["\'][^>]+content=["\']WordPress\s*([\d.]+)#i', $html, $m)) return $m[1];
+        if (preg_match('/\bwordpress\s*([\d.]+)/i', cmsf_meta_generators($html), $m)) return $m[1];
         if (preg_match('#/wp-includes/[^"\'\s>]+\?ver=(\d+\.\d+(?:\.\d+)?)#', $html, $m)) return $m[1];
         $v = cmsf_fetch_version($base . '/feed/', '#<generator>https?://wordpress\.org/\?v=([\d.]+)</generator>#i');
         if ($v) return $v;
         return cmsf_fetch_version($base . '/readme.html', '#Version\s*([\d.]+)#i');
     }
     if ($cms === 'Drupal') {
-        if (preg_match('#<meta[^>]+name=["\']generator["\'][^>]+content=["\']Drupal\s*([\d.]+)#i', $html, $m)) return $m[1];
+        if (preg_match('/\bdrupal\s*([\d.]+)/i', cmsf_meta_generators($html), $m)) return $m[1];
         return cmsf_fetch_version($base . '/CHANGELOG.txt', '#Drupal\s+(\d+\.\d+(?:\.\d+)?)#i');
     }
     return '';

@@ -29,49 +29,73 @@ function cmsf_make_queries($p) {
     $langs = (array)($p['languages'] ?? []);
     $terms = array_values(array_unique(array_merge(cmsf_split_terms($p['categories'] ?? ''), cmsf_split_terms($p['tags'] ?? ''), cmsf_split_terms($p['query'] ?? ''))));
     $any = !$langs || in_array('any', $langs, true);
-    $base = [];
 
     $fp = [
-        'WordPress' => ['inurl:"wp-content"'],
+        'WordPress' => ['inurl:"wp-content/plugins"', 'inurl:"wp-content/themes"'],
         'Joomla' => ['inurl:"option=com_content"', 'inurl:"index.php/component"'],
-        'Drupal' => ['"Powered by Drupal"'],
+        'Drupal' => ['"drupalSettings"', 'inurl:"sites/default/files"'],
         'OpenCart' => ['inurl:"route=product/product"'],
         'PrestaShop' => ['inurl:"controller=product"'],
-        'Magento' => ['inurl:"catalog/product/view"'],
+        'Magento' => ['inurl:"catalog/product/view"', 'inurl:"static/version"'],
         'Shopify' => ['inurl:"/collections/" inurl:"/products/"'],
         'Bitrix' => ['inurl:"/bitrix/"'],
-        'DLE' => ['"DataLife Engine"'],
-        'CS-Cart' => ['"Powered by CS-Cart"'],
-        'Wix' => ['"Created with Wix"'],
-        'Tilda' => ['"Made on Tilda"'],
+        'DLE' => ['inurl:"/engine/"'],
+        'CS-Cart' => ['inurl:"/design/themes/"'],
+        'Wix' => ['"wixstatic.com"'],
+        'Tilda' => ['"tildacdn.com"'],
+        'Squarespace' => ['"static1.squarespace.com"'],
+        'Webflow' => ['"assets.website-files.com"'],
+        'BigCommerce' => ['"bigcommerce.com/stencil/"'],
+        'Shopware' => ['inurl:"/bundles/storefront/"'],
+        'MODX' => ['inurl:"/assets/components/modx/"'],
     ];
     $default_terms = $any || in_array('uk', $langs, true) || in_array('ru', $langs, true) ? ['сайт компанії'] : ['company website'];
+    $groups = [];
 
     foreach ($cms as $c) {
         $T = $terms ?: ($c === 'WooCommerce' ? array_filter([($any || in_array('uk', $langs, true) || in_array('ru', $langs, true)) ? 'інтернет-магазин' : '', ($any || in_array('en', $langs, true)) ? 'online store' : '']) : $default_terms);
+        $group = [];
         if ($c === 'WooCommerce') {
             $phr = [];
             if ($any || in_array('uk', $langs, true)) $phr[] = '"Додати в кошик"';
             if (in_array('ru', $langs, true)) $phr[] = '"В корзину"';
             if ($any || in_array('en', $langs, true)) $phr[] = '"Add to cart"';
             foreach ($T as $t) {
-                foreach ($phr as $ph) $base[] = "\"$t\" $ph";
-                if ($any || in_array('uk', $langs, true)) $base[] = "\"$t\" \"Додати в кошик\" \"Додаткова інформація\"";
-                if ($any || in_array('en', $langs, true)) $base[] = "\"$t\" \"Add to cart\" \"Related products\"";
+                $group[] = 'inurl:"wp-content/plugins/woocommerce" "' . $t . '"';
+                foreach ($phr as $ph) $group[] = "\"$t\" $ph";
+                if ($any || in_array('uk', $langs, true)) $group[] = "\"$t\" \"Додати в кошик\" \"Додаткова інформація\"";
+                if ($any || in_array('en', $langs, true)) $group[] = "\"$t\" \"Add to cart\" \"Related products\"";
             }
         } elseif ($c === 'HivePress') {
-            foreach ($terms ?: ['directory', 'classifieds', 'listings'] as $t) { $base[] = "\"HivePress\" \"$t\""; $base[] = "WordPress HivePress $t"; }
+            foreach ($terms ?: ['directory', 'classifieds', 'listings'] as $t) $group[] = 'inurl:"wp-content/plugins/hivepress" "' . $t . '"';
         } else {
             foreach ($T as $t) {
-                foreach ($fp[$c] ?? ["\"$c\""] as $f) $base[] = "$f \"$t\"";
+                foreach ($fp[$c] ?? ["\"$c\""] as $f) $group[] = "$f \"$t\"";
             }
         }
+        if ($group) $groups[] = array_values(array_unique($group));
     }
-    if (!$cms) foreach ($terms ?: $default_terms as $t) { $base[] = "\"$t\" контакти"; $base[] = "$t official website"; }
+    if (!$cms) {
+        $group = [];
+        foreach ($terms ?: $default_terms as $t) { $group[] = "\"$t\" контакти"; $group[] = "$t official website"; }
+        $groups[] = $group;
+    }
 
+    $suffixes = cmsf_region_suffixes((array)($p['regions'] ?? []));
     $out = [];
-    foreach ($base as $q) foreach (cmsf_region_suffixes((array)($p['regions'] ?? [])) as $s) $out[] = trim("$q $s");
-    return array_slice(array_values(array_unique($out)), 0, 40);
+    for ($i = 0; ; $i++) {
+        $added = false;
+        foreach ($groups as $group) {
+            if (!isset($group[$i])) continue;
+            $added = true;
+            foreach ($suffixes as $suffix) {
+                $out[] = trim($group[$i] . ' ' . $suffix);
+                if (count($out) >= 40) return array_values(array_unique($out));
+            }
+        }
+        if (!$added) break;
+    }
+    return array_values(array_unique($out));
 }
 
 // ============ ПОШУКОВІ СИСТЕМИ ============
@@ -87,7 +111,7 @@ function cmsf_engine_pages($engine) {
     return $engine === 'duckduckgo' ? 1 : 2;
 }
 
-// Лише органічні результати, а не всі посилання сторінки (меню, реклама, «схожі запити»)
+// Лише органічні результати; невідоме розміщення сторінки не підміняємо всіма її посиланнями.
 function cmsf_result_hrefs($html, $engine) {
     $hs = [];
     if ($engine === 'bing') {
@@ -97,8 +121,7 @@ function cmsf_result_hrefs($html, $engine) {
     } elseif ($engine === 'mojeek') {
         if (preg_match_all('#<a\b[^>]*class=["\'][^"\']*\b(?:title|ob)\b[^"\']*["\'][^>]*>#i', $html, $m)) foreach ($m[0] as $tag) if (preg_match('#href=["\']([^"\']+)#i', $tag, $h)) $hs[] = $h[1];
     }
-    if ($hs) return $hs;
-    return preg_match_all('#href\s*=\s*["\']([^"\']+)["\']#i', $html, $m) ? $m[1] : [];
+    return $hs;
 }
 
 function cmsf_blocked_host($host) {

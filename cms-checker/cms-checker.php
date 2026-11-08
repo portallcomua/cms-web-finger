@@ -2,14 +2,14 @@
 /*
 Plugin Name: CMS Web Finder
 Description: Пошук сайтів за CMS, країною та мовою (з перевіркою по коду), збережені списки, шаблони листів і розсилка з прогресом та історією відправлень
-Version: 2.2.0
+Version: 2.2.1
 Author: UAServer
 Text Domain: cms-checker
 */
 
 if (!defined('ABSPATH')) exit;
 
-define('CMSF_VERSION', '2.2.0');
+define('CMSF_VERSION', '2.2.1');
 define('CMSF_DIR', plugin_dir_path(__FILE__));
 define('CMSF_URL', plugin_dir_url(__FILE__));
 
