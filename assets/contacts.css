@@ -1,0 +1,154 @@
+/*
+ * CMS Web Finder 2.3.0
+ * Стилі сторінки збору контактів, кампаній і блеклиста.
+ */
+
+.cmsfc {
+    max-width: 1200px;
+}
+
+.cmsfc .cmsfc-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 18px 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.cmsfc .cmsfc-card h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.cmsfc .cmsfc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px;
+}
+
+.cmsfc .cmsfc-grid label {
+    display: block;
+    font-weight: 600;
+}
+
+.cmsfc .cmsfc-grid input,
+.cmsfc .cmsfc-grid select {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 6px;
+}
+
+.cmsfc .cmsfc-wide {
+    grid-column: 1 / -1;
+}
+
+.cmsfc .cmsfc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.cmsfc .cmsfc-progress {
+    width: 100%;
+    height: 18px;
+    overflow: hidden;
+    margin: 12px 0;
+    background: #e5e7eb;
+    border-radius: 20px;
+}
+
+.cmsfc #cmsfc-progress-fill,
+.cmsfc #cmsfc-campaign-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: #2271b1;
+    border-radius: 20px;
+    transition: width 0.25s ease;
+}
+
+.cmsfc #cmsfc-status,
+.cmsfc #cmsfc-counters,
+.cmsfc #cmsfc-campaign-status {
+    display: block;
+    margin-top: 10px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.cmsfc .cmsfc-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 14px;
+}
+
+.cmsfc .cmsfc-table-wrap table {
+    min-width: 600px;
+}
+
+.cmsfc #cmsfc-blacklist-result {
+    margin-top: 14px;
+    overflow-x: auto;
+}
+
+.cmsfc #cmsfc-blacklist-result table {
+    width: 100%;
+    min-width: 600px;
+}
+
+.cmsfc .cmsfc-message {
+    display: block;
+    margin-top: 10px;
+    padding: 9px 12px;
+    border-radius: 5px;
+    overflow-wrap: anywhere;
+}
+
+.cmsfc .cmsfc-message.is-success {
+    color: #146b2e;
+    background: #edfaef;
+    border: 1px solid #b8e6c2;
+}
+
+.cmsfc .cmsfc-message.is-error {
+    color: #b32d2e;
+    background: #fcf0f1;
+    border: 1px solid #f0c5c8;
+}
+
+.cmsfc button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 782px) {
+    .cmsfc .cmsfc-card {
+        padding: 14px;
+    }
+
+    .cmsfc .cmsfc-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cmsfc .cmsfc-wide {
+        grid-column: auto;
+    }
+
+    .cmsfc .cmsfc-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .cmsfc .cmsfc-actions .button {
+        min-height: 40px;
+        white-space: normal;
+    }
+
+    .cmsfc .cmsfc-progress {
+        height: 22px;
+    }
+}
