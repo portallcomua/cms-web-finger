@@ -1,10 +1,10 @@
 /*
  * CMS Web Finder 2.3.0
- * Стилі сторінки збору контактів, кампаній і блеклиста.
+ * Оформлення сканера, таблиці email, кампаній та блеклиста.
  */
 
 .cmsfc {
-    max-width: 1200px;
+    max-width: 1250px;
 }
 
 .cmsfc .cmsfc-card {
@@ -13,13 +13,13 @@
     border-radius: 8px;
     padding: 20px;
     margin: 18px 0;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
 
 .cmsfc .cmsfc-card h2 {
-    margin-top: 0;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    margin: 0 0 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e5e5;
 }
 
 .cmsfc .cmsfc-grid {
@@ -38,6 +38,7 @@
     display: block;
     width: 100%;
     max-width: 100%;
+    min-height: 38px;
     margin-top: 6px;
 }
 
@@ -48,32 +49,38 @@
 .cmsfc .cmsfc-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin-top: 16px;
+}
+
+.cmsfc .cmsfc-actions .button {
+    min-height: 36px;
 }
 
 .cmsfc .cmsfc-progress {
     width: 100%;
     height: 18px;
+    margin: 16px 0 10px;
     overflow: hidden;
-    margin: 12px 0;
-    background: #e5e7eb;
+    background: #e8eaed;
     border-radius: 20px;
 }
 
-.cmsfc #cmsfc-progress-fill,
-.cmsfc #cmsfc-campaign-fill {
+.cmsfc .cmsfc-progress span {
     display: block;
     width: 0;
     height: 100%;
     background: #2271b1;
     border-radius: 20px;
-    transition: width 0.25s ease;
+    transition: width .25s ease;
 }
 
 .cmsfc #cmsfc-status,
 .cmsfc #cmsfc-counters,
-.cmsfc #cmsfc-campaign-status {
+.cmsfc #cmsfc-campaign-status,
+.cmsfc #cmsfc-email-info,
+.cmsfc #cmsfc-email-pages {
     display: block;
     margin-top: 10px;
     font-weight: 600;
@@ -82,16 +89,55 @@
 
 .cmsfc .cmsfc-table-wrap {
     width: 100%;
+    margin-top: 15px;
     overflow-x: auto;
-    margin-top: 14px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .cmsfc .cmsfc-table-wrap table {
-    min-width: 600px;
+    width: 100%;
+    min-width: 650px;
+    border-collapse: collapse;
+}
+
+.cmsfc .cmsfc-table-wrap th,
+.cmsfc .cmsfc-table-wrap td {
+    padding: 10px 9px;
+    vertical-align: middle;
+}
+
+.cmsfc #cmsfc-email-table td:nth-child(2) {
+    min-width: 190px;
+    overflow-wrap: anywhere;
+}
+
+.cmsfc #cmsfc-email-table td:nth-child(3) {
+    min-width: 260px;
+    overflow-wrap: anywhere;
+}
+
+.cmsfc #cmsfc-email-table td:nth-child(3) a {
+    overflow-wrap: anywhere;
+}
+
+.cmsfc #cmsfc-email-table td:first-child,
+.cmsfc #cmsfc-email-table th:first-child {
+    width: 35px;
+    text-align: center;
+}
+
+.cmsfc .cmsfc-blocked {
+    color: #b32d2e;
+    font-weight: 700;
+}
+
+.cmsfc .cmsfc-allowed {
+    color: #16803c;
+    font-weight: 600;
 }
 
 .cmsfc #cmsfc-blacklist-result {
-    margin-top: 14px;
+    margin-top: 15px;
     overflow-x: auto;
 }
 
@@ -100,55 +146,80 @@
     min-width: 600px;
 }
 
-.cmsfc .cmsfc-message {
-    display: block;
-    margin-top: 10px;
-    padding: 9px 12px;
-    border-radius: 5px;
-    overflow-wrap: anywhere;
+.cmsfc #cmsfc-blacklist-result th,
+.cmsfc #cmsfc-blacklist-result td {
+    padding: 9px;
 }
 
-.cmsfc .cmsfc-message.is-success {
-    color: #146b2e;
-    background: #edfaef;
-    border: 1px solid #b8e6c2;
-}
-
-.cmsfc .cmsfc-message.is-error {
-    color: #b32d2e;
-    background: #fcf0f1;
-    border: 1px solid #f0c5c8;
+.cmsfc .description {
+    line-height: 1.5;
 }
 
 .cmsfc button:disabled {
-    opacity: 0.55;
+    opacity: .55;
     cursor: not-allowed;
 }
 
-@media (max-width: 782px) {
+/* Мобільна версія для керування зі смартфона. */
+@media screen and (max-width: 782px) {
+    .cmsfc {
+        margin-right: 10px;
+    }
+
     .cmsfc .cmsfc-card {
-        padding: 14px;
+        padding: 13px;
+        margin: 12px 0;
+    }
+
+    .cmsfc .cmsfc-card h2 {
+        font-size: 17px;
+        line-height: 1.4;
     }
 
     .cmsfc .cmsfc-grid {
         grid-template-columns: 1fr;
+        gap: 12px;
     }
 
     .cmsfc .cmsfc-wide {
         grid-column: auto;
     }
 
+    .cmsfc .cmsfc-grid input,
+    .cmsfc .cmsfc-grid select {
+        min-height: 42px;
+        font-size: 16px;
+    }
+
     .cmsfc .cmsfc-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
+        gap: 8px;
     }
 
     .cmsfc .cmsfc-actions .button {
-        min-height: 40px;
+        min-height: 42px;
+        height: auto;
         white-space: normal;
+        line-height: 1.3;
+        padding: 7px 9px;
     }
 
     .cmsfc .cmsfc-progress {
         height: 22px;
+    }
+
+    .cmsfc .cmsfc-table-wrap table {
+        min-width: 650px;
+    }
+
+    .cmsfc #cmsfc-email-info {
+        line-height: 1.5;
+    }
+}
+
+@media screen and (max-width: 380px) {
+    .cmsfc .cmsfc-actions {
+        grid-template-columns: 1fr;
     }
 }
