@@ -1,7 +1,6 @@
 /**
  * CMS Web Finder 2.3.0
- * Керування збором контактів, кампаніями та блеклистом.
- * Усі запити виконуються через захищений WordPress AJAX.
+ * Керування збором email, переглядом контактів і кампаніями.
  */
 (function () {
     'use strict';
@@ -9,38 +8,22 @@
     document.addEventListener('DOMContentLoaded', function () {
         const app = document.getElementById('cmsfc-app');
 
-        // Скрипт працює тільки на сторінці нового модуля контактів.
         if (!app || typeof CMSFC === 'undefined') {
             return;
         }
 
         let currentListId = 0;
-        let currentCampaignId = 0;
+        let currentPage = 1;
+        let totalPages = 1;
         let scanRunning = false;
         let campaignRunning = false;
-        let scanStopped = false;
-        let campaignStopped = false;
+        let campaignId = 0;
 
-        const $ = function (selector) {
-            return app.querySelector(selector);
+        const $ = function (id) {
+            return document.getElementById(id);
         };
 
-        const setText = function (selector, value) {
-            const element = $(selector);
-            if (element) {
-                element.textContent = value == null ? '' : String(value);
-            }
-        };
-
-        const setWidth = function (selector, value) {
-            const element = $(selector);
-            if (element) {
-                const number = Math.max(0, Math.min(100, Number(value) || 0));
-                element.style.width = number + '%';
-            }
-        };
-
-        // Єдина функція AJAX для всіх операцій модуля.
+        // Надсилає захищений AJAX-запит до WordPress.
         async function request(action, values) {
             const body = new URLSearchParams();
 
@@ -48,7 +31,15 @@
             body.append('nonce', CMSFC.nonce);
 
             Object.keys(values || {}).forEach(function (key) {
-                body.append(key, values[key] == null ? '' : String(values[key]));
+                const value = values[key];
+
+                if (Array.isArray(value)) {
+                    value.forEach(function (item) {
+                        body.append(key + '[]', String(item));
+                    });
+                } else {
+                    body.append(key, value == null ? '' : String(value));
+                }
             });
 
             const response = await fetch(CMSFC.ajax, {
@@ -65,7 +56,7 @@
             if (!result || !result.success) {
                 const message = result && result.data
                     ? result.data
-                    : 'Сервер повернув помилку.';
+                    : 'Помилка сервера.';
 
                 throw new Error(
                     typeof message === 'string'
@@ -77,99 +68,241 @@
             return result.data;
         }
 
-        // Безпечно показуємо повідомлення, не вставляючи HTML від сервера.
-        function showMessage(selector, message, type) {
-            const element = $(selector);
-            if (!element) {
-                return;
-            }
-
-            element.textContent = message || '';
-            element.className = 'cmsfc-message';
-
-            if (type) {
-                element.classList.add('is-' + type);
+        // Виводить звичайний текст повідомлення.
+        function message(id, text) {
+            if ($(id)) {
+                $(id).textContent = text || '';
             }
         }
 
-        // Оновлює таблицю списків і список для вибору кампанії.
+        // Встановлює ширину індикатора прогресу.
+        function progress(id, value) {
+            if ($(id)) {
+                const n = Math.max(0, Math.min(100, Number(value) || 0));
+                $(id).style.width = n + '%';
+            }
+        }
+
+        // Завантажує всі збережені списки.
         async function loadLists() {
-            const data = await request('cmsfc_lists', {});
-            const rows = Array.isArray(data) ? data : [];
+            const rows = await request('cmsfc_lists', {});
+            const view = $('cmsfc-view-list');
+            const campaign = $('cmsfc-campaign-list');
+            const table = app.querySelector('.cmsfc-table-wrap table tbody');
 
-            const campaignSelect = $('#cmsfc-campaign-list');
-            const table = app.querySelector('.cmsfc-table-wrap table');
+            const oldView = view ? view.value : '';
+            const oldCampaign = campaign ? campaign.value : '';
 
-            if (campaignSelect) {
-                const selected = campaignSelect.value;
-
-                campaignSelect.innerHTML = '';
-
-                const first = document.createElement('option');
-                first.value = '';
-                first.textContent = '— Оберіть список —';
-                campaignSelect.appendChild(first);
-
-                rows.forEach(function (item) {
-                    const option = document.createElement('option');
-                    option.value = item.id;
-                    option.textContent =
-                        (item.name || item.domain || 'Список') +
-                        ' — ' + (item.contacts_count || 0) + ' email';
-
-                    campaignSelect.appendChild(option);
-                });
-
-                if (selected) {
-                    campaignSelect.value = selected;
-                }
+            if (view) {
+                view.innerHTML = '<option value="">— Виберіть список —</option>';
             }
 
-            // Оновлюємо тіло таблиці, не змінюючи її заголовки.
+            if (campaign) {
+                campaign.innerHTML = '<option value="">— Виберіть список —</option>';
+            }
+
             if (table) {
-                let tbody = table.querySelector('tbody');
+                table.innerHTML = '';
+            }
 
-                if (!tbody) {
-                    tbody = document.createElement('tbody');
-                    table.appendChild(tbody);
+            rows.forEach(function (item) {
+                const label = item.name + ' (' + item.emails_found + ' email)';
+
+                if (view) {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = label;
+                    view.appendChild(option);
                 }
 
-                tbody.innerHTML = '';
+                if (campaign) {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = label;
+                    campaign.appendChild(option);
+                }
 
-                if (!rows.length) {
+                if (table) {
                     const tr = document.createElement('tr');
-                    const td = document.createElement('td');
-                    td.colSpan = 5;
-                    td.textContent = 'Списків поки немає.';
-                    tr.appendChild(td);
-                    tbody.appendChild(tr);
-                } else {
-                    rows.forEach(function (item) {
-                        const tr = document.createElement('tr');
 
-                        [
-                            item.name || '',
-                            item.domain || '',
-                            item.pages_done || 0,
-                            item.emails_found || 0,
-                            item.status || ''
-                        ].forEach(function (value) {
-                            const td = document.createElement('td');
-                            td.textContent = String(value);
-                            tr.appendChild(td);
-                        });
-
-                        tbody.appendChild(tr);
+                    [
+                        item.name,
+                        item.domain,
+                        item.pages_done,
+                        item.emails_found,
+                        item.status
+                    ].forEach(function (value) {
+                        const td = document.createElement('td');
+                        td.textContent = String(value);
+                        tr.appendChild(td);
                     });
+
+                    table.appendChild(tr);
                 }
+            });
+
+            if (view && oldView) {
+                view.value = oldView;
+            }
+
+            if (campaign && oldCampaign) {
+                campaign.value = oldCampaign;
             }
 
             return rows;
         }
 
-        // Один крок сканування. Сервер обробляє обмежену кількість сторінок.
+        // Завантажує одну сторінку таблиці контактів.
+        async function loadContacts() {
+            const listId = Number($('cmsfc-view-list')?.value || 0);
+
+            if (!listId) {
+                message('cmsfc-email-info', 'Спочатку виберіть список.');
+                return;
+            }
+
+            currentListId = listId;
+
+            const search = $('cmsfc-email-search')?.value || '';
+            const filter = $('cmsfc-email-filter')?.value || 'all';
+
+            message('cmsfc-email-info', 'Завантаження адрес…');
+
+            try {
+                const data = await request('cmsfc_contacts', {
+                    list_id: listId,
+                    page: currentPage,
+                    search: search,
+                    filter: filter
+                });
+
+                totalPages = Number(data.pages || 1);
+
+                const tbody = $('cmsfc-email-table').querySelector('tbody');
+                tbody.innerHTML = '';
+
+                if (!data.rows || !data.rows.length) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+
+                    td.colSpan = 5;
+                    td.textContent = 'За цими параметрами адрес не знайдено.';
+
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                } else {
+                    data.rows.forEach(function (item) {
+                        const tr = document.createElement('tr');
+
+                        const selectCell = document.createElement('td');
+                        const checkbox = document.createElement('input');
+
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'cmsfc-contact-select';
+                        checkbox.value = item.id;
+
+                        selectCell.appendChild(checkbox);
+                        tr.appendChild(selectCell);
+
+                        const emailCell = document.createElement('td');
+                        emailCell.textContent = item.email;
+                        tr.appendChild(emailCell);
+
+                        const sourceCell = document.createElement('td');
+                        const link = document.createElement('a');
+
+                        link.href = item.source_url;
+                        link.target = '_blank';
+                        link.rel = 'noopener noreferrer';
+                        link.textContent = item.source_url;
+
+                        sourceCell.appendChild(link);
+                        tr.appendChild(sourceCell);
+
+                        const dateCell = document.createElement('td');
+                        dateCell.textContent = item.created_at;
+                        tr.appendChild(dateCell);
+
+                        const blockedCell = document.createElement('td');
+                        blockedCell.textContent = Number(item.blocked)
+                            ? 'У блеклисті'
+                            : 'Дозволена';
+
+                        blockedCell.className = Number(item.blocked)
+                            ? 'cmsfc-blocked'
+                            : 'cmsfc-allowed';
+
+                        tr.appendChild(blockedCell);
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                message(
+                    'cmsfc-email-info',
+                    'Знайдено записів: ' + data.total +
+                    '. Сторінка ' + data.page + ' із ' + data.pages + '.'
+                );
+
+                message(
+                    'cmsfc-email-pages',
+                    'Сторінка ' + data.page + ' із ' + data.pages
+                );
+
+                $('cmsfc-select-all').checked = false;
+
+            } catch (error) {
+                message('cmsfc-email-info', 'Помилка: ' + error.message);
+            }
+        }
+
+        // Запуск збору email.
+        $('cmsfc-start').addEventListener('click', async function () {
+            if (scanRunning) {
+                return;
+            }
+
+            const domain = $('cmsfc-domain').value.trim();
+
+            if (!domain) {
+                message('cmsfc-status', 'Вкажіть домен.');
+                return;
+            }
+
+            scanRunning = true;
+            progress('cmsfc-progress-fill', 0);
+            message('cmsfc-status', 'Створення списку…');
+
+            try {
+                const data = await request('cmsfc_start', {
+                    domain: domain,
+                    name: $('cmsfc-name').value.trim(),
+                    max_pages: $('cmsfc-max-pages').value,
+                    max_depth: $('cmsfc-max-depth').value
+                });
+
+                currentListId = Number(data.list_id);
+
+                if (!currentListId) {
+                    throw new Error('Сервер не повернув номер списку.');
+                }
+
+                await loadLists();
+
+                $('cmsfc-view-list').value = String(currentListId);
+                currentPage = 1;
+
+                message('cmsfc-status', 'Сканування розпочато.');
+                await scanStep();
+
+            } catch (error) {
+                scanRunning = false;
+                message('cmsfc-status', 'Помилка: ' + error.message);
+            }
+        });
+
+        // Обробляє чергові три сторінки сайту.
         async function scanStep() {
-            if (!scanRunning || scanStopped || !currentListId) {
+            if (!scanRunning || !currentListId) {
                 return;
             }
 
@@ -178,375 +311,296 @@
                     list_id: currentListId
                 });
 
-                const pages = Number(data.pages || 0);
-                const emails = Number(data.emails || 0);
-                const remaining = Number(data.remaining || 0);
-                const done = Boolean(data.done);
-
-                setText(
-                    '#cmsfc-counters',
-                    'Перевірено сторінок: ' + pages +
-                    ' · Знайдено email: ' + emails +
-                    (remaining ? ' · У черзі: ' + remaining : '')
-                );
-
-                const maxPages = Number($('#cmsfc-max-pages')?.value || 100);
-                const percent = maxPages > 0
-                    ? Math.min(100, (pages / maxPages) * 100)
+                const max = Number($('cmsfc-max-pages').value || 100);
+                const percent = max > 0
+                    ? Math.min(100, data.pages / max * 100)
                     : 0;
 
-                setWidth('#cmsfc-progress-fill', done ? 100 : percent);
+                progress('cmsfc-progress-fill', data.done ? 100 : percent);
 
-                if (done) {
+                message(
+                    'cmsfc-status',
+                    data.done
+                        ? 'Сканування завершено.'
+                        : 'Сканування триває…'
+                );
+
+                message(
+                    'cmsfc-counters',
+                    'Перевірено сторінок: ' + data.pages +
+                    ' · Знайдено email: ' + data.emails +
+                    ' · У черзі сторінок: ' + data.remaining
+                );
+
+                await loadLists();
+
+                if ($('cmsfc-view-list')) {
+                    $('cmsfc-view-list').value = String(currentListId);
+                }
+
+                await loadContacts();
+
+                if (data.done) {
                     scanRunning = false;
-                    setText('#cmsfc-status', 'Сканування завершено.');
-                    await loadLists();
                     return;
                 }
 
-                setText('#cmsfc-status', 'Сканування триває…');
-
-                // Наступний крок виконується окремим запитом, щоб не перевантажувати сервер.
                 window.setTimeout(scanStep, 500);
 
             } catch (error) {
                 scanRunning = false;
-                setText('#cmsfc-status', 'Помилка: ' + error.message);
+                message('cmsfc-status', 'Помилка сканування: ' + error.message);
             }
         }
 
-        // Стартуємо новий збір email за вказаним доменом.
-        const startButton = $('#cmsfc-start');
-
-        if (startButton) {
-            startButton.addEventListener('click', async function () {
-                if (scanRunning) {
-                    return;
-                }
-
-                const domain = $('#cmsfc-domain')?.value.trim() || '';
-                const name = $('#cmsfc-name')?.value.trim() || '';
-                const maxPages = $('#cmsfc-max-pages')?.value || 100;
-                const maxDepth = $('#cmsfc-max-depth')?.value || 3;
-
-                if (!domain) {
-                    setText('#cmsfc-status', 'Вкажіть домен сайту.');
-                    return;
-                }
-
-                scanStopped = false;
-                setText('#cmsfc-status', 'Створення списку та запуск сканування…');
-                setWidth('#cmsfc-progress-fill', 0);
-
-                try {
-                    const data = await request('cmsfc_start', {
-                        domain: domain,
-                        name: name,
-                        max_pages: maxPages,
-                        max_depth: maxDepth
-                    });
-
-                    currentListId = Number(
-                        data.list_id || data.id || data.id_list || 0
-                    );
-
-                    if (!currentListId) {
-                        throw new Error('Сервер не повернув номер створеного списку.');
-                    }
-
-                    scanRunning = true;
-                    setText('#cmsfc-status', 'Список створено. Сканування почалося.');
-                    await loadLists();
-                    await scanStep();
-
-                } catch (error) {
-                    scanRunning = false;
-                    setText('#cmsfc-status', 'Помилка: ' + error.message);
-                }
-            });
-        }
-
-        // Пауза сканування на сервері.
-        const pauseButton = $('#cmsfc-pause');
-
-        if (pauseButton) {
-            pauseButton.addEventListener('click', async function () {
-                if (!currentListId) {
-                    setText('#cmsfc-status', 'Спочатку запустіть сканування.');
-                    return;
-                }
-
-                try {
-                    await request('cmsfc_control', {
-                        list_id: currentListId,
-                        command: 'pause'
-                    });
-
-                    scanRunning = false;
-                    setText('#cmsfc-status', 'Сканування призупинено.');
-
-                } catch (error) {
-                    setText('#cmsfc-status', 'Помилка: ' + error.message);
-                }
-            });
-        }
-
-        // Продовження раніше призупиненого сканування.
-        const resumeButton = $('#cmsfc-resume');
-
-        if (resumeButton) {
-            resumeButton.addEventListener('click', async function () {
-                if (!currentListId) {
-                    setText('#cmsfc-status', 'Немає списку для продовження.');
-                    return;
-                }
-
-                try {
-                    await request('cmsfc_control', {
-                        list_id: currentListId,
-                        command: 'resume'
-                    });
-
-                    scanStopped = false;
-                    scanRunning = true;
-                    setText('#cmsfc-status', 'Сканування продовжено.');
-                    await scanStep();
-
-                } catch (error) {
-                    scanRunning = false;
-                    setText('#cmsfc-status', 'Помилка: ' + error.message);
-                }
-            });
-        }
-
-        // Зупиняє сканування на сервері.
-        const stopButton = $('#cmsfc-stop');
-
-        if (stopButton) {
-            stopButton.addEventListener('click', async function () {
-                if (!currentListId) {
-                    setText('#cmsfc-status', 'Немає активного списку.');
-                    return;
-                }
-
-                try {
-                    await request('cmsfc_control', {
-                        list_id: currentListId,
-                        command: 'stop'
-                    });
-
-                    scanStopped = true;
-                    scanRunning = false;
-                    setText('#cmsfc-status', 'Сканування зупинено.');
-                    await loadLists();
-
-                } catch (error) {
-                    setText('#cmsfc-status', 'Помилка: ' + error.message);
-                }
-            });
-        }
-
-        // Послідовно обробляємо чергу кампанії невеликими пакетами.
-        async function campaignStep() {
-            if (!campaignRunning || campaignStopped || !currentCampaignId) {
+        // Пауза, продовження або зупинка сканування.
+        async function controlScan(command) {
+            if (!currentListId) {
+                message('cmsfc-status', 'Спочатку запустіть сканування.');
                 return;
             }
 
             try {
-                const data = await request('cmsfc_campaign_step', {
-                    campaign_id: currentCampaignId
+                await request('cmsfc_control', {
+                    list_id: currentListId,
+                    command: command
                 });
 
-                const sent = Number(data.sent || 0);
-                const failed = Number(data.failed || 0);
-                const pending = Number(data.pending || 0);
-                const done = Boolean(data.done);
-
-                setText(
-                    '#cmsfc-campaign-status',
-                    'Надіслано: ' + sent +
-                    ' · Помилки/пропуски: ' + failed +
-                    (pending ? ' · Залишилося: ' + pending : '')
-                );
-
-                if (done) {
-                    campaignRunning = false;
-                    setWidth('#cmsfc-campaign-fill', 100);
-                    setText(
-                        '#cmsfc-campaign-status',
-                        'Кампанію завершено. Надіслано: ' +
-                        sent + ', помилки/пропуски: ' + failed
+                if (command === 'pause' || command === 'stop') {
+                    scanRunning = false;
+                    message(
+                        'cmsfc-status',
+                        command === 'pause'
+                            ? 'Сканування призупинено.'
+                            : 'Сканування зупинено.'
                     );
-                    return;
                 }
 
-                const total = sent + failed + pending;
-                const percent = total > 0
-                    ? ((sent + failed) / total) * 100
-                    : 0;
+                if (command === 'resume') {
+                    scanRunning = true;
+                    message('cmsfc-status', 'Сканування продовжено.');
+                    await scanStep();
+                }
 
-                setWidth('#cmsfc-campaign-fill', percent);
-
-                window.setTimeout(campaignStep, 700);
+                await loadLists();
 
             } catch (error) {
-                campaignRunning = false;
-                setText(
-                    '#cmsfc-campaign-status',
-                    'Помилка кампанії: ' + error.message
-                );
+                message('cmsfc-status', 'Помилка: ' + error.message);
             }
         }
 
-        // Запускаємо кампанію за вибраним списком і шаблоном.
-        const campaignStart = $('#cmsfc-campaign-start');
+        $('cmsfc-pause').addEventListener('click', function () {
+            controlScan('pause');
+        });
 
-        if (campaignStart) {
-            campaignStart.addEventListener('click', async function () {
-                if (campaignRunning) {
-                    return;
-                }
+        $('cmsfc-resume').addEventListener('click', function () {
+            controlScan('resume');
+        });
 
-                const listId = $('#cmsfc-campaign-list')?.value || '';
-                const templateId = $('#cmsfc-template')?.value || '';
-                const name = $('#cmsfc-campaign-name')?.value.trim() || '';
+        $('cmsfc-stop').addEventListener('click', function () {
+            controlScan('stop');
+        });
 
-                if (!listId) {
-                    setText('#cmsfc-campaign-status', 'Оберіть список контактів.');
-                    return;
-                }
+        // Вибір списку та оновлення таблиці email.
+        $('cmsfc-email-refresh').addEventListener('click', function () {
+            currentPage = 1;
+            loadContacts();
+        });
 
-                if (!templateId) {
-                    setText('#cmsfc-campaign-status', 'Оберіть шаблон листа.');
-                    return;
-                }
+        $('cmsfc-view-list').addEventListener('change', function () {
+            currentPage = 1;
+            loadContacts();
+        });
 
-                campaignStopped = false;
-                setWidth('#cmsfc-campaign-fill', 0);
-                setText('#cmsfc-campaign-status', 'Створення кампанії…');
+        $('cmsfc-email-filter').addEventListener('change', function () {
+            currentPage = 1;
+            loadContacts();
+        });
 
-                try {
-                    const data = await request('cmsfc_campaign_start', {
-                        list_id: listId,
-                        template_id: templateId,
-                        name: name
-                    });
+        // Пошук запускається після натискання Enter.
+        $('cmsfc-email-search').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                currentPage = 1;
+                loadContacts();
+            }
+        });
 
-                    currentCampaignId = Number(
-                        data.campaign_id || data.id || data.id_campaign || 0
-                    );
+        // Перехід між сторінками таблиці.
+        $('cmsfc-email-prev').addEventListener('click', function () {
+            if (currentPage > 1) {
+                currentPage--;
+                loadContacts();
+            }
+        });
 
-                    if (!currentCampaignId) {
-                        throw new Error('Сервер не повернув номер кампанії.');
-                    }
+        $('cmsfc-email-next').addEventListener('click', function () {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadContacts();
+            }
+        });
 
-                    campaignRunning = true;
-                    setText('#cmsfc-campaign-status', 'Кампанію запущено.');
-                    await campaignStep();
-
-                } catch (error) {
-                    campaignRunning = false;
-                    setText(
-                        '#cmsfc-campaign-status',
-                        'Помилка: ' + error.message
-                    );
-                }
+        // Позначає або знімає позначки з усіх рядків поточної сторінки.
+        $('cmsfc-select-all').addEventListener('change', function () {
+            app.querySelectorAll('.cmsfc-contact-select').forEach(function (checkbox) {
+                checkbox.checked = $('cmsfc-select-all').checked;
             });
-        }
+        });
 
-        // Додаємо email до глобального блеклиста вручну.
-        const blacklistAdd = $('#cmsfc-blacklist-add');
-
-        if (blacklistAdd) {
-            blacklistAdd.addEventListener('click', async function () {
-                const email = $('#cmsfc-blacklist-email')?.value.trim() || '';
-                const reason = $('#cmsfc-blacklist-reason')?.value.trim() || '';
-
-                if (!email) {
-                    showMessage(
-                        '#cmsfc-blacklist-result',
-                        'Введіть email.',
-                        'error'
-                    );
-                    return;
-                }
-
-                try {
-                    const data = await request('cmsfc_blacklist_add', {
-                        email: email,
-                        reason: reason
-                    });
-
-                    showMessage(
-                        '#cmsfc-blacklist-result',
-                        typeof data === 'string' ? data : 'Адресу додано до блеклиста.',
-                        'success'
-                    );
-
-                    $('#cmsfc-blacklist-email').value = '';
-                    $('#cmsfc-blacklist-reason').value = '';
-
-                    await loadBlacklist();
-
-                } catch (error) {
-                    showMessage(
-                        '#cmsfc-blacklist-result',
-                        error.message,
-                        'error'
-                    );
-                }
+        // Видаляє тільки вибрані записи контактів.
+        $('cmsfc-email-delete').addEventListener('click', async function () {
+            const ids = Array.from(
+                app.querySelectorAll('.cmsfc-contact-select:checked')
+            ).map(function (checkbox) {
+                return checkbox.value;
             });
-        }
 
-        // Показуємо глобальний блеклист.
-        async function loadBlacklist() {
-            const data = await request('cmsfc_blacklist', {});
-            const rows = Array.isArray(data) ? data : [];
-            const result = $('#cmsfc-blacklist-result');
-
-            if (!result) {
+            if (!ids.length) {
+                message('cmsfc-email-info', 'Спочатку позначте адреси для видалення.');
                 return;
             }
 
-            result.innerHTML = '';
+            if (!window.confirm('Видалити вибрані адреси зі списку?')) {
+                return;
+            }
+
+            try {
+                const result = await request('cmsfc_contacts_delete', {
+                    ids: ids
+                });
+
+                message(
+                    'cmsfc-email-info',
+                    'Видалено записів: ' + result.deleted
+                );
+
+                await loadContacts();
+                await loadLists();
+
+            } catch (error) {
+                message('cmsfc-email-info', 'Помилка: ' + error.message);
+            }
+        });
+
+        // Копіює всі адреси вибраного списку в буфер обміну.
+        $('cmsfc-email-copy').addEventListener('click', async function () {
+            const listId = Number($('cmsfc-view-list').value || 0);
+
+            if (!listId) {
+                message('cmsfc-email-info', 'Виберіть список.');
+                return;
+            }
+
+            try {
+                const data = await request('cmsfc_contacts_copy', {
+                    list_id: listId
+                });
+
+                if (!data.emails) {
+                    message('cmsfc-email-info', 'У списку поки немає адрес.');
+                    return;
+                }
+
+                await navigator.clipboard.writeText(data.emails);
+
+                message(
+                    'cmsfc-email-info',
+                    'Скопійовано адрес: ' + data.count
+                );
+
+            } catch (error) {
+                message(
+                    'cmsfc-email-info',
+                    'Не вдалося скопіювати. ' + error.message
+                );
+            }
+        });
+
+        // Відкриває готовий CSV-файл для завантаження.
+        $('cmsfc-email-export').addEventListener('click', function () {
+            const listId = Number($('cmsfc-view-list').value || 0);
+
+            if (!listId) {
+                message('cmsfc-email-info', 'Виберіть список.');
+                return;
+            }
+
+            const url = new URL(CMSFC.exportUrl, window.location.origin);
+
+            url.searchParams.set('action', 'cmsfc_export');
+            url.searchParams.set('list_id', String(listId));
+            url.searchParams.set('_wpnonce', CMSFC.exportNonce);
+
+            window.location.href = url.toString();
+        });
+
+        // Додає адресу до глобального блеклиста.
+        $('cmsfc-blacklist-add').addEventListener('click', async function () {
+            const email = $('cmsfc-blacklist-email').value.trim();
+            const reason = $('cmsfc-blacklist-reason').value.trim();
+
+            if (!email) {
+                message('cmsfc-blacklist-result', 'Введіть email.');
+                return;
+            }
+
+            try {
+                const result = await request('cmsfc_blacklist_add', {
+                    email: email,
+                    reason: reason
+                });
+
+                message('cmsfc-blacklist-result', result);
+                $('cmsfc-blacklist-email').value = '';
+                $('cmsfc-blacklist-reason').value = '';
+
+                await loadBlacklist();
+                await loadContacts();
+
+            } catch (error) {
+                message('cmsfc-blacklist-result', 'Помилка: ' + error.message);
+            }
+        });
+
+        // Завантажує та показує глобальний блеклист.
+        async function loadBlacklist() {
+            const rows = await request('cmsfc_blacklist', {});
+            const target = $('cmsfc-blacklist-result');
+
+            target.innerHTML = '';
 
             if (!rows.length) {
-                result.textContent = 'У блеклисті поки немає адрес.';
+                target.textContent = 'Блеклист поки порожній.';
                 return;
             }
 
             const table = document.createElement('table');
             table.className = 'widefat striped';
 
-            const thead = document.createElement('thead');
-            const headerRow = document.createElement('tr');
+            const head = document.createElement('thead');
+            const header = document.createElement('tr');
 
             ['Email', 'Причина', 'Джерело', 'Дата', 'Дія'].forEach(function (label) {
                 const th = document.createElement('th');
                 th.textContent = label;
-                headerRow.appendChild(th);
+                header.appendChild(th);
             });
 
-            thead.appendChild(headerRow);
-            table.appendChild(thead);
+            head.appendChild(header);
+            table.appendChild(head);
 
             const tbody = document.createElement('tbody');
 
             rows.forEach(function (item) {
                 const tr = document.createElement('tr');
 
-                [
-                    item.email || '',
-                    item.reason || '',
-                    item.source || '',
-                    item.created_at || ''
-                ].forEach(function (value) {
+                [item.email, item.reason, item.source, item.created_at].forEach(function (value) {
                     const td = document.createElement('td');
-                    td.textContent = String(value);
+                    td.textContent = value || '';
                     tr.appendChild(td);
                 });
 
-                const actionCell = document.createElement('td');
+                const action = document.createElement('td');
                 const button = document.createElement('button');
 
                 button.type = 'button';
@@ -554,7 +608,7 @@
                 button.textContent = 'Розблокувати';
 
                 button.addEventListener('click', async function () {
-                    if (!window.confirm('Розблокувати цю адресу?')) {
+                    if (!window.confirm('Розблокувати адресу ' + item.email + '?')) {
                         return;
                     }
 
@@ -564,32 +618,117 @@
                         });
 
                         await loadBlacklist();
+                        await loadContacts();
 
                     } catch (error) {
-                        showMessage(
-                            '#cmsfc-blacklist-result',
-                            error.message,
-                            'error'
-                        );
+                        message('cmsfc-blacklist-result', error.message);
                     }
                 });
 
-                actionCell.appendChild(button);
-                tr.appendChild(actionCell);
+                action.appendChild(button);
+                tr.appendChild(action);
                 tbody.appendChild(tr);
             });
 
             table.appendChild(tbody);
-            result.appendChild(table);
+            target.appendChild(table);
         }
 
-        // Початкове завантаження списків і блеклиста.
+        // Створює кампанію та запускає відправлення малими пакетами.
+        $('cmsfc-campaign-start').addEventListener('click', async function () {
+            if (campaignRunning) {
+                return;
+            }
+
+            const listId = $('cmsfc-campaign-list').value;
+            const templateId = $('cmsfc-template').value;
+
+            if (!listId || !templateId) {
+                message('cmsfc-campaign-status', 'Оберіть список і шаблон.');
+                return;
+            }
+
+            if (!window.confirm(
+                'Запустити кампанію? Надсилання піде лише адресам, які не перебувають у блеклисті.'
+            )) {
+                return;
+            }
+
+            campaignRunning = true;
+            progress('cmsfc-campaign-fill', 0);
+            message('cmsfc-campaign-status', 'Створення кампанії…');
+
+            try {
+                const data = await request('cmsfc_campaign_start', {
+                    list_id: listId,
+                    template_id: templateId,
+                    name: $('cmsfc-campaign-name').value.trim()
+                });
+
+                campaignId = Number(data.campaign_id);
+
+                if (!campaignId) {
+                    throw new Error('Не отримано номер кампанії.');
+                }
+
+                await campaignStep();
+
+            } catch (error) {
+                campaignRunning = false;
+                message('cmsfc-campaign-status', 'Помилка: ' + error.message);
+            }
+        });
+
+        // Надсилає наступні три листи кампанії.
+        async function campaignStep() {
+            if (!campaignRunning || !campaignId) {
+                return;
+            }
+
+            try {
+                const data = await request('cmsfc_campaign_step', {
+                    campaign_id: campaignId
+                });
+
+                const total = data.sent + data.failed + data.pending;
+                const percent = total
+                    ? (data.sent + data.failed) / total * 100
+                    : 100;
+
+                progress('cmsfc-campaign-fill', data.done ? 100 : percent);
+
+                message(
+                    'cmsfc-campaign-status',
+                    'Надіслано: ' + data.sent +
+                    ' · Помилки або пропуски: ' + data.failed +
+                    ' · У черзі: ' + data.pending
+                );
+
+                if (data.done) {
+                    campaignRunning = false;
+                    message(
+                        'cmsfc-campaign-status',
+                        'Кампанію завершено. Надіслано: ' +
+                        data.sent + ', помилки або пропуски: ' + data.failed
+                    );
+                    return;
+                }
+
+                window.setTimeout(campaignStep, 1000);
+
+            } catch (error) {
+                campaignRunning = false;
+                message('cmsfc-campaign-status', 'Помилка: ' + error.message);
+            }
+        }
+
+        // Початкове завантаження.
         loadLists().catch(function (error) {
-            setText('#cmsfc-status', 'Не вдалося завантажити списки: ' + error.message);
+            message('cmsfc-status', 'Не вдалося завантажити списки: ' + error.message);
         });
 
         loadBlacklist().catch(function (error) {
-            showMessage('#cmsfc-blacklist-result', error.message, 'error');
+            message('cmsfc-blacklist-result', 'Помилка блеклиста: ' + error.message);
         });
     });
 })();
