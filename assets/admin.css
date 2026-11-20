@@ -98,3 +98,7 @@
 .cmsf-presets label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; min-width: 260px; }
 .cmsf-tpl-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 @media (max-width: 782px) { .cmsf-presets label { min-width: 0; width: 100%; } .cmsf-presets .button { flex: 1 1 auto; min-height: 42px; } }
+
+/* UA Web Finder 2.4: resizable multiline notes and sortable table headings */
+.cmsf .inp-note{min-width:180px;min-height:42px;resize:both;white-space:pre-wrap;}
+.cmsf .cmsf-sort{border:0;background:transparent;color:inherit;font-weight:600;cursor:pointer;padding:2px 4px;}
