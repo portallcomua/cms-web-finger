@@ -59,7 +59,7 @@
 
   // ============ КОМПОНЕНТ «СПИСОК САЙТІВ» ============
   function createListView(root, listId) {
-    const S = { page: 1, pages: 1, total: 0, sel: new Set(), rows: {}, stats: {}, tpls: [], sending: false, stopSend: false, verifying: false };
+    const S = { page: 1, pages: 1, total: 0, sel: new Set(), rows: {}, stats: {}, tpls: [], sending: false, stopSend: false, verifying: false, order_by: 'id', order_dir: 'DESC', noteSuggestions: [] };
     root.innerHTML = `
       <div class="cmsf-lv-stats"></div>
       <div class="cmsf-lv-filters">
@@ -67,7 +67,7 @@
         <select class="f-state"><option value="ok">Знайдені</option><option value="queued">У черзі</option><option value="rejected">Відхилені</option><option value="failed">Недоступні</option><option value="all">Усі</option></select>
         <select class="f-sent"><option value="">Відправка: усі</option><option value="unsent">Ще не надсилали</option><option value="sent">Надіслано успішно</option><option value="failed">Помилка відправки</option></select>
         <select class="f-cms"><option value="">Усі CMS</option></select>
-        <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>
+        <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>\n        <select class="f-notes"><option value="">Нотатки: усі</option><option value="with">З нотатками</option><option value="without">Без нотаток</option></select>
         <label class="cmsf-chk"><input type="checkbox" class="f-outdated"> Застаріла версія</label>
       </div>
       <div class="cmsf-lv-actions">
@@ -106,12 +106,12 @@
         </div>
       </div>
       <div class="cmsf-table-wrap"><table class="cmsf-table"><thead><tr>
-        <th class="c-sel"></th><th>Сайт</th><th>CMS</th><th>Країна / мова</th><th>Email</th><th>Телефон</th><th>Нотатка</th><th>Відправлено</th><th></th>
+        <th class="c-sel"></th><th><button type="button" class="cmsf-sort" data-sort="domain">Сайт ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="cms">CMS ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="country">Країна / мова ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="email">Email ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="phone">Телефон ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="note">Нотатка ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="sent_at">Відправлено ↕</button></th><th></th>
       </tr></thead><tbody></tbody></table></div>
       <div class="cmsf-pager"><button type="button" class="button p-prev">←</button><span class="p-info"></span><button type="button" class="button p-next">→</button></div>`;
     const q = s => $(s, root);
     const tbody = q('tbody');
-    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '' });
+    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '', notes: q('.f-notes').value, order_by: S.order_by, order_dir: S.order_dir });
     const msg = t => { q('.lv-msg').textContent = t || ''; };
 
     function sentCell(r) {
@@ -129,7 +129,7 @@
         <td data-label="Країна / мова">${esc(r.country || '—')}<div class="cmsf-sub">${esc(r.language || '')}</div></td>
         <td data-label="Email"><input type="text" class="inp-email" value="${esc(r.email)}" placeholder="email"></td>
         <td data-label="Телефон">${esc(r.phone || '—')}</td>
-        <td data-label="Нотатка"><input type="text" class="inp-note" value="${esc(r.note || '')}" placeholder="нотатка"></td>
+        <td data-label="Нотатка"><textarea class="inp-note" rows="2" list="cmsf-note-suggestions" placeholder="Нотатка (автодата)">${esc(r.note || '')}</textarea></td>
         <td data-label="Відправлено" class="c-sent">${sentCell(r)}</td>
         <td class="c-act"><button type="button" class="button row-del" title="Видалити">✕</button></td></tr>`;
     }
@@ -162,9 +162,9 @@
     async function load(page) {
       if (page) S.page = page;
       const d = await api('rows', Object.assign({ list_id: listId, page: S.page }, filters()));
-      S.total = d.total; S.pages = d.pages; S.page = d.page; S.stats = d.stats; S.rows = {};
+      S.total = d.total; S.pages = d.pages; S.page = d.page; S.stats = d.stats; S.rows = {}; S.noteSuggestions = d.note_suggestions || [];
       d.rows.forEach(r => { S.rows[r.id] = r; });
-      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
+      let dl = q('#cmsf-note-suggestions');\n      if (!dl) { dl = document.createElement('datalist'); dl.id = 'cmsf-note-suggestions'; root.appendChild(dl); }\n      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');\n      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
       const cs = q('.f-cms'), cur = cs.value;
       cs.innerHTML = '<option value="">Усі CMS</option>' + d.cms_list.map(c => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
       q('.p-info').textContent = 'Сторінка ' + S.page + ' з ' + S.pages + ' · всього ' + S.total;
@@ -175,8 +175,8 @@
     // --- події ---
     let t;
     q('.f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(1), 350); });
-    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated'].forEach(s => q(s).addEventListener('change', () => load(1)));
-    q('.p-prev').onclick = () => load(S.page - 1);
+    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(s => q(s).addEventListener('change', () => load(1)));
+    $('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => { const key = b.dataset.sort; S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC'; S.order_by = key; load(1); }));\n    q('.p-prev').onclick = () => load(S.page - 1);
     q('.p-next').onclick = () => load(S.page + 1);
     tbody.addEventListener('change', e => {
       const tr = e.target.closest('tr'); if (!tr) return;
