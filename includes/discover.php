@@ -171,7 +171,7 @@ const CMSF_MAJESTIC_URL = 'https://downloads.majestic.com/majestic_million.csv';
 
 function cmsf_zones() {
     return [
-        'ua' => ['ua', 'укр'],
+        'ua' => ['ua', 'укр', 'xn--j1amh'],
         'eu' => ['at', 'be', 'bg', 'hr', 'cy', 'cz', 'dk', 'ee', 'fi', 'fr', 'de', 'gr', 'hu', 'ie', 'it', 'lv', 'lt', 'lu', 'mt', 'nl', 'pl', 'pt', 'ro', 'sk', 'si', 'es', 'se', 'eu', 'no', 'ch', 'is', 'li'],
         'us' => ['us'],
         'world' => null,
