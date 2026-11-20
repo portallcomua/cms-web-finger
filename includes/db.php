@@ -127,7 +127,6 @@ function cmsf_seed_presets() {
 function cmsf_migrate_old() {
     global $wpdb;
     if (get_option('cmsf_migrated')) return;
-    update_option('cmsf_migrated', 1);
     $old = get_option('cms_checker_results', []);
     $notes = get_option('cms_checker_notes', []);
     $tpl = get_option('cms_checker_template', '');
@@ -149,6 +148,9 @@ function cmsf_migrate_old() {
     if ($tpl) {
         $wpdb->insert(cmsf_t('templates'), ['name' => 'Шаблон зі старої версії', 'topic' => 'Імпорт', 'subject' => 'Пропозиція щодо сайту {domain}', 'body' => $tpl, 'is_html' => 0, 'created_at' => $now, 'updated_at' => $now]);
     }
+
+    // Позначаємо міграцію завершеною лише після виконання всіх операцій.
+    if (empty($wpdb->last_error)) update_option('cmsf_migrated', 1, false);
 }
 
 function cmsf_defaults() {
