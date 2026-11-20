@@ -16,6 +16,7 @@ function cmsf_template_vars($site) {
     return [
         '{url}'            => (string)($site['url'] ?? ''),
         '{domain}'         => (string)($site['domain'] ?? ''),
+        '{site}'           => (string)($site['title'] ?? $site['domain'] ?? ''),
         '{site_title}'     => (string)($site['title'] ?? ''),
         '{cms}'            => (string)($site['cms'] ?? ''),
         '{version}'        => !empty($site['version']) ? $site['version'] : 'невизначена',
