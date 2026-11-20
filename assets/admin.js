@@ -342,7 +342,7 @@
     const logEl = $('#cmsf-log');
     const ctrl = { stop: false };
     let running = false;
-    const log = s => { logEl.textContent += s + '\\n'; logEl.scrollTop = logEl.scrollHeight; };
+    const log = s => { logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; };
     const stage = s => { $('#cmsf-stage').textContent = s; };
     const bar = p => { $('#cmsf-bar-fill').style.width = Math.max(0, Math.min(100, p)) + '%'; };
     const vals = name => $$('input[name="' + name + '"]:checked', form).map(i => i.value);
@@ -402,7 +402,7 @@
     if (fileEl) fileEl.addEventListener('change', e => {
       const f = e.target.files[0]; if (!f) return;
       const r = new FileReader();
-      r.onload = () => { const ta = form.elements.domains; ta.value = (ta.value ? ta.value + '\\n' : '') + r.result; };
+      r.onload = () => { const ta = form.elements.domains; ta.value = (ta.value ? ta.value + '\n' : '') + r.result; };
       r.readAsText(f);
     });
 
