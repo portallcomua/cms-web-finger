@@ -448,8 +448,8 @@ function cmsf_inspect($domain, $params) {
             if ($c2['emails'] || $c2['phones']) { $contacts = $c2; break; }
         }
     }
-    $rec['email'] = cmsf_best_email($contacts['emails'], $domain);
-    $rec['emails'] = implode('; ', $contacts['emails']);
+    $rec['email'] = implode(', ', $contacts['emails']);
+    $rec['emails'] = implode(', ', $contacts['emails']);
     $rec['phone'] = implode('; ', $contacts['phones']);
     $rec['state'] = 'ok';
     return $rec;
