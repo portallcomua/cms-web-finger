@@ -1,0 +1,26 @@
+name: Build WordPress update package
+
+on:
+  push:
+    branches:
+      - feature/2.4.0-ua-improvements
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble package with the original plugin directory slug
+        run: |
+          mkdir -p package/cms-web-finder
+          cp -R cms-web-finder.php includes assets README.md package/cms-web-finder/
+          cd package
+          zip -r ../ua-web-finder-update.zip cms-web-finder
+      - name: Upload update ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ua-web-finder-update
+          path: ua-web-finder-update.zip
+          if-no-files-found: error
+          retention-days: 30
