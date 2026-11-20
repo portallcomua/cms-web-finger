@@ -129,7 +129,7 @@
         <td data-label="Країна / мова">${esc(r.country || '—')}<div class="cmsf-sub">${esc(r.language || '')}</div></td>
         <td data-label="Email"><input type="text" class="inp-email" value="${esc(r.email)}" placeholder="email"></td>
         <td data-label="Телефон">${esc(r.phone || '—')}</td>
-        <td data-label="Нотатка"><textarea class="inp-note" rows="2" list="cmsf-note-suggestions" placeholder="Нотатка (автодата)">${esc(r.note || '')}</textarea></td>
+        <td data-label="Нотатка"><div class="cmsf-note-wrap"><textarea class="inp-note" rows="2" placeholder="Нотатка (автодата)">${esc(r.note || '')}</textarea><div class="cmsf-note-suggest" hidden></div></div></td>
         <td data-label="Відправлено" class="c-sent">${sentCell(r)}</td>
         <td class="c-act"><button type="button" class="button row-del" title="Видалити">✕</button></td></tr>`;
     }
@@ -174,8 +174,28 @@
       renderStats(); renderSel();
     }
 
-    // --- події ---
-    let t;
+    // Підказки раніше використаних нотаток за першими літерами.
+    tbody.addEventListener('input', e => {
+      if (!e.target.classList.contains('inp-note')) return;
+      const wrap = e.target.closest('.cmsf-note-wrap');
+      const menu = wrap.querySelector('.cmsf-note-suggest');
+      const query = e.target.value.trim().toLocaleLowerCase();
+      if (query.length < 1) { menu.hidden = true; return; }
+      const matches = S.noteSuggestions.filter(v => v.toLocaleLowerCase().startsWith(query)).slice(0, 8);
+      menu.innerHTML = matches.map(v => '<button type="button" class="cmsf-note-suggestion" data-value="' + esc(v) + '">' + esc(v) + '</button>').join('');
+      menu.hidden = !matches.length;
+    });
+    tbody.addEventListener('click', e => {
+      const suggestion = e.target.closest('.cmsf-note-suggestion');
+      if (suggestion) {
+        const wrap = suggestion.closest('.cmsf-note-wrap');
+        const field = wrap.querySelector('.inp-note');
+        field.value = suggestion.dataset.value;
+        wrap.querySelector('.cmsf-note-suggest').hidden = true;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      const b = e.target.closest('.row-del'); if (!b) return;
     q('.f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(1), 350); });
     ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(s => q(s).addEventListener('change', () => load(1)));
     $('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => { const key = b.dataset.sort; S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC'; S.order_by = key; load(1); }));\n    q('.p-prev').onclick = () => load(S.page - 1);
@@ -190,7 +210,6 @@
       }
     });
     tbody.addEventListener('click', e => {
-      const b = e.target.closest('.row-del'); if (!b) return;
       const id = Number(b.closest('tr').dataset.id);
       if (confirm('Видалити цей сайт зі списку?')) api('rows_delete', { ids: [id] }).then(() => { S.sel.delete(id); load(); });
     });
