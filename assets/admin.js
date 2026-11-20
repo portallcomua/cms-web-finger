@@ -164,7 +164,9 @@
       const d = await api('rows', Object.assign({ list_id: listId, page: S.page }, filters()));
       S.total = d.total; S.pages = d.pages; S.page = d.page; S.stats = d.stats; S.rows = {}; S.noteSuggestions = d.note_suggestions || [];
       d.rows.forEach(r => { S.rows[r.id] = r; });
-      let dl = q('#cmsf-note-suggestions');\n      if (!dl) { dl = document.createElement('datalist'); dl.id = 'cmsf-note-suggestions'; root.appendChild(dl); }\n      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');\n      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
+      let dl = q('#cmsf-note-suggestions');
+      if (!dl) { dl = document.createElement('datalist'); dl.id = 'cmsf-note-suggestions'; root.appendChild(dl); }
+      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');\n      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
       const cs = q('.f-cms'), cur = cs.value;
       cs.innerHTML = '<option value="">Усі CMS</option>' + d.cms_list.map(c => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
       q('.p-info').textContent = 'Сторінка ' + S.page + ' з ' + S.pages + ' · всього ' + S.total;
@@ -512,10 +514,10 @@
     const form = $('#cmsf-tpl-form'), msg = $('#cmsf-tpl-msg');
     let tpls = [];
     const say = (t, bad) => { msg.textContent = t; msg.className = 'cmsf-msg' + (bad ? ' cmsf-bad' : ''); };
-    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: form.elements.body.value, is_html: form.elements.is_html.checked ? 1 : '' });
+    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: form.elements.body.value, is_html: form.querySelector('input[name="is_html"]:checked').value === '1' ? 1 : 0 });
     function fill(t) {
       form.elements.id.value = t ? t.id : 0; form.elements.name.value = t ? t.name : ''; form.elements.topic.value = t ? t.topic : '';
-      form.elements.subject.value = t ? t.subject : ''; form.elements.body.value = t ? t.body : ''; form.elements.is_html.checked = !!(t && Number(t.is_html));
+      form.elements.subject.value = t ? t.subject : ''; form.elements.body.value = t ? t.body : ''; Array.from(form.querySelectorAll('input[name="is_html"]')).forEach(r => { r.checked = r.value === (t && Number(t.is_html) ? '1' : '0'); });
       $('#cmsf-tpl-prev').hidden = true; say('');
       $$('.cmsf-tpl-item').forEach(i => i.classList.toggle('active', t && i.dataset.id === String(t.id)));
     }
