@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 add_action('admin_menu', function () {
-    add_menu_page('CMS Web Finder', 'CMS Web Finder', 'manage_options', 'cms-checker', 'cmsf_page_search', 'dashicons-search', 30);
+    add_menu_page('UA Web Finder', 'UA Web Finder', 'manage_options', 'cms-checker', 'cmsf_page_search', 'dashicons-search', 30);
     add_submenu_page('cms-checker', 'Пошук сайтів', 'Пошук', 'manage_options', 'cms-checker', 'cmsf_page_search');
     add_submenu_page('cms-checker', 'Свій список доменів', 'Свій список', 'manage_options', 'cmsf-import', 'cmsf_page_import');
     add_submenu_page('cms-checker', 'Збережені списки', 'Списки', 'manage_options', 'cmsf-lists', 'cmsf_page_lists');
@@ -43,7 +43,7 @@ function cmsf_page_search() {
     $platforms = array_combine(cmsf_platforms(), cmsf_platforms());
     ?>
     <div class="wrap cmsf" data-page="search">
-        <h1>CMS Web Finder — пошук сайтів</h1>
+        <h1>UA Web Finder — пошук сайтів</h1>
         <div class="cmsf-card">
             <div class="cmsf-presets">
                 <label><span>Шаблон пошуку (збережені параметри)</span><select id="cmsf-preset"><option value="">— обрати збережений шаблон —</option></select></label>
