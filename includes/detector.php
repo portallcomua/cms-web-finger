@@ -231,7 +231,7 @@ function cmsf_detect_country($domain, $text, $phones, $html_lang, $langs) {
     $tld = strtolower(substr(strrchr($domain, '.') ?: '', 1));
     $sig = [];
     $code = '';
-    if ($tld === 'ua') { $code = 'UA'; $sig[] = '.ua'; }
+    if (cmsf_is_ua_domain($domain)) { $code = 'UA'; $sig[] = 'український домен'; }
     foreach ($phones as $p) {
         $d = preg_replace('/\D/', '', $p);
         if (strpos($d, '380') === 0 && strlen($d) === 12) { $code = $code ?: 'UA'; $sig[] = '+380'; break; }
@@ -247,7 +247,7 @@ function cmsf_detect_country($domain, $text, $phones, $html_lang, $langs) {
     elseif ($weak) $label = 'Невизначено (лише українська мова)';
     elseif ($code) $label = 'Інша (' . $code . ')';
     else $label = 'Невідомо';
-    return ['code' => $code, 'europe' => $europe, 'ua_domain' => $tld === 'ua', 'label' => $label];
+    return ['code' => $code, 'europe' => $europe, 'ua_domain' => cmsf_is_ua_domain($domain), 'label' => $label];
 }
 
 function cmsf_site_type($html, $title, $text, $cms) {
