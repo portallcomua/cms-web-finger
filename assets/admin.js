@@ -67,7 +67,8 @@
         <select class="f-state"><option value="ok">Знайдені</option><option value="queued">У черзі</option><option value="rejected">Відхилені</option><option value="failed">Недоступні</option><option value="all">Усі</option></select>
         <select class="f-sent"><option value="">Відправка: усі</option><option value="unsent">Ще не надсилали</option><option value="sent">Надіслано успішно</option><option value="failed">Помилка відправки</option></select>
         <select class="f-cms"><option value="">Усі CMS</option></select>
-        <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>\n        <select class="f-notes"><option value="">Нотатки: усі</option><option value="with">З нотатками</option><option value="without">Без нотаток</option></select>
+        <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>
+        <select class="f-notes"><option value="">Нотатки: усі</option><option value="with">З нотатками</option><option value="without">Без нотаток</option></select>
         <label class="cmsf-chk"><input type="checkbox" class="f-outdated"> Застаріла версія</label>
       </div>
       <div class="cmsf-lv-actions">
@@ -166,7 +167,8 @@
       d.rows.forEach(r => { S.rows[r.id] = r; });
       let dl = q('#cmsf-note-suggestions');
       if (!dl) { dl = document.createElement('datalist'); dl.id = 'cmsf-note-suggestions'; root.appendChild(dl); }
-      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');\n      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
+      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');
+      tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
       const cs = q('.f-cms'), cur = cs.value;
       cs.innerHTML = '<option value="">Усі CMS</option>' + d.cms_list.map(c => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
       q('.p-info').textContent = 'Сторінка ' + S.page + ' з ' + S.pages + ' · всього ' + S.total;
@@ -340,7 +342,8 @@
     const logEl = $('#cmsf-log');
     const ctrl = { stop: false };
     let running = false;
-    const log = s => { logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; };
+    const log = s => { logEl.textContent += s + '
+'; logEl.scrollTop = logEl.scrollHeight; };
     const stage = s => { $('#cmsf-stage').textContent = s; };
     const bar = p => { $('#cmsf-bar-fill').style.width = Math.max(0, Math.min(100, p)) + '%'; };
     const vals = name => $$('input[name="' + name + '"]:checked', form).map(i => i.value);
@@ -400,7 +403,8 @@
     if (fileEl) fileEl.addEventListener('change', e => {
       const f = e.target.files[0]; if (!f) return;
       const r = new FileReader();
-      r.onload = () => { const ta = form.elements.domains; ta.value = (ta.value ? ta.value + '\n' : '') + r.result; };
+      r.onload = () => { const ta = form.elements.domains; ta.value = (ta.value ? ta.value + '
+' : '') + r.result; };
       r.readAsText(f);
     });
 
