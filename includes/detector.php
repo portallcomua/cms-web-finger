@@ -302,7 +302,7 @@ function cmsf_extract_contacts($html, $text) {
         $n = strlen(preg_replace('/\D/', '', $p));
         if ($n >= 9 && $n <= 15) $ph[$p] = true;
     }
-    return ['emails' => array_slice(array_keys($clean), 0, 10), 'phones' => array_slice(array_keys($ph), 0, 6)];
+    return ['emails' => array_keys($clean), 'phones' => array_slice(array_keys($ph), 0, 6)];
 }
 
 // Основний email: спершу з домену самого сайту, потім решта
