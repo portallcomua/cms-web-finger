@@ -18,7 +18,7 @@ function cmsf_split_terms($v) {
 function cmsf_region_suffixes($regions) {
     $s = [];
     if (!$regions || in_array('world', $regions, true)) $s[] = '';
-    if (in_array('ua', $regions, true)) $s[] = '(site:.ua OR site:.com.ua OR site:.org.ua OR site:.net.ua OR site:.in.ua OR site:.biz.ua OR site:.co.ua OR site:.gov.ua OR site:.edu.ua OR site:.укр)';
+    if (in_array('ua', $regions, true)) $s[] = '(site:.ua OR site:.com.ua OR site:.org.ua OR site:.net.ua OR site:.in.ua OR site:.biz.ua OR site:.co.ua OR site:.gov.ua OR site:.edu.ua OR site:.укр OR site:xn--j1amh)';
     if (in_array('eu', $regions, true)) $s[] = '(site:.eu OR site:.de OR site:.pl OR site:.fr OR site:.it OR site:.es)';
     if (in_array('us', $regions, true)) $s[] = '(site:.us OR "United States")';
     return $s ?: [''];
@@ -154,6 +154,11 @@ function cmsf_extract_domains($html, $engine) {
 }
 
 // Повертає ['domains'=>[...]] або ['error'=>'...']
+function cmsf_is_ua_domain($domain) {
+    $domain = strtolower(rtrim((string)$domain, '.'));
+    return (bool)preg_match('/(?:^|\\.)(?:ua|укр|xn--j1amh)$/u', $domain);
+}
+
 function cmsf_engine_search($engine, $q, $ua, $page) {
     $url = cmsf_engine_url($engine, $q, $ua, $page);
     if (!$url) return ['error' => 'Невідоме джерело'];
