@@ -40,7 +40,7 @@ function cmsf_install() {
   language varchar(120) NOT NULL DEFAULT '',
   site_type varchar(60) NOT NULL DEFAULT '',
   relevance int(11) NOT NULL DEFAULT 0,
-  email varchar(255) NOT NULL DEFAULT '',
+  email text NULL,
   emails text NULL,
   phone varchar(255) NOT NULL DEFAULT '',
   note text NULL,
@@ -223,6 +223,9 @@ function cmsf_add_queued($list_id, $domains) {
     foreach (array_unique($domains) as $d) {
         $d = cmsf_norm_domain($d);
         if (!$d || strpos($d, '.') === false) continue;
+        // Не створюємо повторний запис домену, якщо він уже є в будь-якому списку.
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE domain=%s LIMIT 1", $d));
+        if ($exists) continue;
         $values[] = $wpdb->prepare("(%d,%s,%s,'queued')", $list_id, $d, 'https://' . $d);
     }
     $added = 0;
