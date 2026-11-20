@@ -184,7 +184,7 @@ function cmsf_page_templates() {
                         <label><span>Тема (група)</span><input type="text" name="topic" list="cmsf-topics" placeholder="Joomla, WordPress, Плагіни…"><datalist id="cmsf-topics"></datalist></label>
                         <label class="cmsf-wide"><span>Тема листа (Subject)</span><input type="text" name="subject"></label>
                         <label class="cmsf-wide"><span>Текст листа</span><textarea name="body" rows="12"></textarea></label>
-                        <label class="cmsf-wide cmsf-check"><input type="checkbox" name="is_html" value="1"> Надсилати як HTML (інакше — звичайний текст)</label>
+                        <fieldset class="cmsf-wide"><legend>Формат листа</legend><label><input type="radio" name="is_html" value="0" checked> Звичайний текст</label><label><input type="radio" name="is_html" value="1"> HTML</label></fieldset>
                     </div>
                     <p class="description">Змінні: <code>{url}</code> <code>{domain}</code> <code>{site_title}</code> <code>{cms}</code> <code>{version}</code> <code>{latest_version}</code> <code>{email}</code></p>
                     <div class="cmsf-actions">
