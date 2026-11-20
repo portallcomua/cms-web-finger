@@ -96,7 +96,7 @@
             <label><span>Назва шаблону</span><input type="text" class="n-name"></label>
             <label><span>Тема (група)</span><input type="text" class="n-topic" placeholder="Joomla, WordPress, Плагіни…"></label>
             <label class="cmsf-wide"><span>Тема листа</span><input type="text" class="n-subject"></label>
-            <label class="cmsf-wide"><span>Текст листа (змінні: {url} {domain} {site_title} {cms} {version} {latest_version})</span><textarea class="n-body" rows="6"></textarea></label>
+            <label class="cmsf-wide"><span>Текст листа (змінні: {url} {domain} {site} {site_title} {cms} {version} {latest_version})</span><textarea class="n-body" rows="6"></textarea></label><fieldset class="cmsf-wide"><legend>Формат листа</legend><label><input type="radio" name="n-is-html" value="0" checked> Звичайний текст</label> <label><input type="radio" name="n-is-html" value="1"> HTML</label></fieldset>
           </div>
           <button type="button" class="button button-primary n-save">Зберегти шаблон</button> <button type="button" class="button n-saveas" hidden>Зберегти як новий</button> <button type="button" class="button n-cancel">Скасувати</button> <span class="cmsf-msg n-msg"></span>
         </div>
@@ -242,7 +242,7 @@
     S.editId = 0;
     const fillEditor = t => {
       q('.n-name').value = t ? t.name : ''; q('.n-topic').value = t ? t.topic : ''; q('.n-subject').value = t ? t.subject : ''; q('.n-body').value = t ? t.body : '';
-      S.editId = t ? Number(t.id) : 0; S.editHtml = t ? t.is_html : 0;
+      S.editId = t ? Number(t.id) : 0; S.editHtml = t ? Number(t.is_html) : 0; root.querySelectorAll('input[name="n-is-html"]').forEach(r => { r.checked = r.value === String(S.editHtml); });
       q('.n-save').textContent = t ? 'Зберегти зміни' : 'Зберегти шаблон';
       q('.n-saveas').hidden = !t; q('.n-msg').textContent = ''; q('.s-new').hidden = false;
     };
@@ -262,7 +262,7 @@
     const saveTpl = async asNew => {
       const m = q('.n-msg');
       try {
-        const r = await api('tpl_save', { id: asNew ? 0 : S.editId, name: q('.n-name').value, topic: q('.n-topic').value, subject: q('.n-subject').value, body: q('.n-body').value, is_html: asNew ? '' : (Number(S.editHtml) ? 1 : '') });
+        const r = await api('tpl_save', { id: asNew ? 0 : S.editId, name: q('.n-name').value, topic: q('.n-topic').value, subject: q('.n-subject').value, body: q('.n-body').value, is_html: root.querySelector('input[name="n-is-html"]:checked').value });
         await loadTpls(r.id); q('.s-new').hidden = true; msg('Шаблон збережено і вибрано');
       } catch (e) { m.textContent = e.message; }
     };
