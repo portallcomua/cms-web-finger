@@ -185,20 +185,16 @@
       menu.innerHTML = matches.map(v => '<button type="button" class="cmsf-note-suggestion" data-value="' + esc(v) + '">' + esc(v) + '</button>').join('');
       menu.hidden = !matches.length;
     });
-    tbody.addEventListener('click', e => {
-      const suggestion = e.target.closest('.cmsf-note-suggestion');
-      if (suggestion) {
-        const wrap = suggestion.closest('.cmsf-note-wrap');
-        const field = wrap.querySelector('.inp-note');
-        field.value = suggestion.dataset.value;
-        wrap.querySelector('.cmsf-note-suggest').hidden = true;
-        field.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-      const b = e.target.closest('.row-del'); if (!b) return;
+    let t;
     q('.f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(1), 350); });
-    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(s => q(s).addEventListener('change', () => load(1)));
-    $('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => { const key = b.dataset.sort; S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC'; S.order_by = key; load(1); }));\n    q('.p-prev').onclick = () => load(S.page - 1);
+    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(sel => q(sel).addEventListener('change', () => load(1)));
+    $$('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => {
+      const key = b.dataset.sort;
+      S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC';
+      S.order_by = key;
+      load(1);
+    }));
+    q('.p-prev').onclick = () => load(S.page - 1);
     q('.p-next').onclick = () => load(S.page + 1);
     tbody.addEventListener('change', e => {
       const tr = e.target.closest('tr'); if (!tr) return;
@@ -210,6 +206,16 @@
       }
     });
     tbody.addEventListener('click', e => {
+      const suggestion = e.target.closest('.cmsf-note-suggestion');
+      if (suggestion) {
+        const wrap = suggestion.closest('.cmsf-note-wrap');
+        const field = wrap.querySelector('.inp-note');
+        field.value = suggestion.dataset.value;
+        wrap.querySelector('.cmsf-note-suggest').hidden = true;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      const b = e.target.closest('.row-del'); if (!b) return;
       const id = Number(b.closest('tr').dataset.id);
       if (confirm('Видалити цей сайт зі списку?')) api('rows_delete', { ids: [id] }).then(() => { S.sel.delete(id); load(); });
     });
