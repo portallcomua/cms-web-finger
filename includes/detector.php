@@ -191,10 +191,10 @@ function cmsf_latest($cms) {
     $s = cmsf_settings();
     $manual = trim((string)($s['latest_' . strtolower($key)] ?? ''));
     if ($manual !== '') return $manual;
-    $cache = get_transient('cmsf_latest_cache');
+    $cache = get_transient('cmsf_latest_cache_v2');
     if ($cache === false) {
         $cache = cmsf_fetch_latest();
-        set_transient('cmsf_latest_cache', $cache, array_filter($cache) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
+        set_transient('cmsf_latest_cache_v2', $cache, array_filter($cache) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
     }
     return (string)($cache[$key] ?? '');
 }
