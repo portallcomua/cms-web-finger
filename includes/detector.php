@@ -171,15 +171,15 @@ function cmsf_fetch_latest() {
         if (!empty($j['offers'][0]['current'])) $out['WordPress'] = $j['offers'][0]['current'];
     }
     foreach (['Joomla' => 'joomla/joomla-cms', 'Drupal' => 'drupal/drupal'] as $k => $repo) {
-        $r = wp_remote_get("https://api.github.com/repos/$repo/tags?per_page=100", ['timeout' => 8, 'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'cms-web-finder']]);
-        if (is_wp_error($r)) continue;
-        $j = json_decode(wp_remote_retrieve_body($r), true);
-        $best = '';
-        if (is_array($j)) foreach ($j as $t) {
-            $n = ltrim((string)($t['name'] ?? ''), 'v');
-            if (preg_match('/^\d+\.\d+(\.\d+)?$/', $n) && ($best === '' || version_compare($n, $best, '>'))) $best = $n;
-        }
-        $out[$k] = $best;
+        // Беремо останній стабільний реліз, а не найбільший тег (у тегах можуть бути гілки та службові версії).
+        $r = wp_remote_get("https://api.github.com/repos/$repo/releases/latest", [
+            'timeout' => 8,
+            'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'ua-web-finder']
+        ]);
+        if (is_wp_error($r) || (int)wp_remote_retrieve_response_code($r) !== 200) continue;
+        $release = json_decode(wp_remote_retrieve_body($r), true);
+        $tag = ltrim((string)($release['tag_name'] ?? ''), 'v');
+        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $tag)) $out[$k] = $tag;
     }
     return $out;
 }
