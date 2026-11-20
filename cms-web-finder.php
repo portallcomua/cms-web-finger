@@ -1,9 +1,9 @@
 
 <?php
 /*
-Plugin Name: CMS Web Finder
+Plugin Name: UA Web Finder
 Description: Пошук сайтів за CMS, збір контактів із публічних сторінок, списки, кампанії та керування відписками.
-Version: 2.3.1
+Version: 2.4.0
 Author: UAServer
 Text Domain: cms-checker
 */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Версія плагіна та шляхи до його файлів.
-define('CMSF_VERSION', '2.3.1');
+define('CMSF_VERSION', '2.4.0');
 define('CMSF_DIR', plugin_dir_path(__FILE__));
 define('CMSF_URL', plugin_dir_url(__FILE__));
 
