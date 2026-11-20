@@ -137,9 +137,11 @@ cmsf_ajax('rows', function () {
     list($where, $args) = cmsf_where($id, cmsf_filters_from_post());
     $t = cmsf_t('sites');
     $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE $where", $args));
-    $sort = $f['order_by'] ?? 'id';
-    $dir = ($f['order_dir'] ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
-    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY $sort $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    $filters = cmsf_filters_from_post();
+    $allowed_sort = ['domain','cms','version','country','language','email','phone','note','sent_at','id'];
+    $sort = in_array($filters['order_by'], $allowed_sort, true) ? $filters['order_by'] : 'id';
+    $dir = $filters['order_dir'] === 'ASC' ? 'ASC' : 'DESC';
+    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY `$sort` $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
     $cms_list = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT cms FROM $t WHERE list_id=%d AND state='ok' AND cms<>'' ORDER BY cms", $id));
     wp_send_json_success(['rows' => array_map('cmsf_row_out', $rows), 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list, 'note_suggestions' => array_slice((array)get_option('cmsf_note_history', []), 0, 30)]);
 });
