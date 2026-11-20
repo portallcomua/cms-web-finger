@@ -160,7 +160,8 @@ cmsf_ajax('row_update', function () {
     if (!$site) wp_send_json_error('Сайт не знайдено');
     if ($field === 'note') {
         $note = sanitize_textarea_field($val);
-        if ($note !== '' && $note !== (string)$site['note'] && !preg_match('/^\[\d{2}\.\d{2}\.\d{4}\]/', $note)) {
+        if ($note !== '' && $note !== (string)$site['note']) {
+            $note = preg_replace('/^\[\d{2}\.\d{2}\.\d{4}(?: \d{2}:\d{2})?\]\s*/', '', $note);
             $note = '[' . wp_date('d.m.Y H:i') . '] ' . $note;
         }
         // Нотатка спільна для всіх входжень домену в різних списках.
