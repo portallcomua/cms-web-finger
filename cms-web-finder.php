@@ -3,7 +3,7 @@
 /*
 Plugin Name: UA Web Finder
 Description: Пошук сайтів за CMS, збір контактів із публічних сторінок, списки, кампанії та керування відписками.
-Version: 2.4.0
+Version: 2.4.1
 Author: UAServer
 Text Domain: cms-checker
 */
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Версія плагіна та шляхи до його файлів.
-define('CMSF_VERSION', '2.4.0');
+define('CMSF_VERSION', '2.4.1');
 define('CMSF_DIR', plugin_dir_path(__FILE__));
 define('CMSF_URL', plugin_dir_url(__FILE__));
 
@@ -174,7 +174,7 @@ function cmsf_github_release_info($force = false) {
             break;
         }
     }
-    if (!$package && !empty($release['zipball_url'])) $package = esc_url_raw($release['zipball_url']);
+    // Never use the repository zipball: it has a different root folder and breaks in-place WordPress updates.
 
     $data = [
         'version' => $tag,
@@ -198,7 +198,7 @@ add_filter('pre_set_site_transient_update_plugins', function ($transient) {
     if (version_compare($release['version'], CMSF_VERSION, '<=')) return $transient;
 
     $transient->response[$plugin_file] = (object)[
-        'slug' => 'ua-web-finder',
+        'slug' => 'cms-checker',
         'plugin' => $plugin_file,
         'new_version' => $release['version'],
         'url' => $release['url'],
@@ -211,12 +211,12 @@ add_filter('pre_set_site_transient_update_plugins', function ($transient) {
 });
 
 add_filter('plugins_api', function ($result, $action, $args) {
-    if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== 'ua-web-finder') return $result;
+    if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== 'cms-checker') return $result;
     $release = cmsf_github_release_info();
     if (empty($release['version'])) return $result;
     return (object)[
         'name' => 'UA Web Finder',
-        'slug' => 'ua-web-finder',
+        'slug' => 'cms-checker',
         'version' => $release['version'],
         'author' => 'UAServer',
         'homepage' => 'https://github.com/portallcomua/cms-web-finger',
