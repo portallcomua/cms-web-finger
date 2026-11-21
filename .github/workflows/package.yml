@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Assemble package using the legacy WordPress plugin path
+      - name: Assemble package matching the existing cms-web-finder installation
         run: |
-          mkdir -p package/cms-checker
-          cp cms-web-finder.php package/cms-checker/cms-checker.php
-          cp -R includes assets README.md package/cms-checker/
+          mkdir -p package/cms-web-finder
+          cp cms-web-finder.php package/cms-web-finder/cms-web-finder.php
+          cp -R includes assets README.md package/cms-web-finder/
           cd package
-          zip -r ../ua-web-finder.zip cms-checker
+          zip -r ../ua-web-finder.zip cms-web-finder
       - name: Upload update ZIP
         uses: actions/upload-artifact@v6
         with:
