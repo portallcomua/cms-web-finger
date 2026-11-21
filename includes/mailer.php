@@ -16,6 +16,7 @@ function cmsf_template_vars($site) {
     return [
         '{url}'            => (string)($site['url'] ?? ''),
         '{domain}'         => (string)($site['domain'] ?? ''),
+        '{site}'           => (string)($site['title'] ?? $site['domain'] ?? ''),
         '{site_title}'     => (string)($site['title'] ?? ''),
         '{cms}'            => (string)($site['cms'] ?? ''),
         '{version}'        => !empty($site['version']) ? $site['version'] : 'невизначена',
@@ -131,28 +132,20 @@ function cmsf_send_site($site_id, $template_id) {
         ];
     }
 
-    // Перевіряємо адресу отримувача.
-    $to = sanitize_email($site['email']);
-
-    if (!is_email($to)) {
-        return [
-            'ok'      => false,
-            'skipped' => true,
-            'error'   => 'Немає коректного email'
-        ];
+    // Підтримуємо одну або кілька адрес через кому/крапку з комою.
+    $raw = trim((string)($site['email'] ?? ''));
+    if ($raw === '') $raw = trim((string)($site['emails'] ?? ''));
+    $parts = preg_split('/[,;\\s]+/', $raw, -1, PREG_SPLIT_NO_EMPTY);
+    $recipients = [];
+    foreach ($parts as $part) {
+        $email = strtolower(sanitize_email($part));
+        if (!is_email($email)) continue;
+        if (function_exists('cmsf_contact_is_blocked') && cmsf_contact_is_blocked($email)) continue;
+        $recipients[$email] = $email;
     }
-
-    // Глобальний блеклист: адреса, яку заблокували, не отримує лист.
-    if (
-        function_exists('cmsf_contact_is_blocked') &&
-        cmsf_contact_is_blocked($to)
-    ) {
-        return [
-            'ok'      => false,
-            'skipped' => true,
-            'blocked' => true,
-            'error'   => 'Адреса перебуває у глобальному блеклисті'
-        ];
+    $recipients = array_values($recipients);
+    if (!$recipients) {
+        return ['ok' => false, 'skipped' => true, 'error' => 'Немає коректних email поза блеклистом'];
     }
 
     // Підготовлюємо тему та текст листа.
@@ -184,7 +177,7 @@ function cmsf_send_site($site_id, $template_id) {
 
     // Відправляємо лист через стандартний механізм WordPress і чинний SMTP.
     $ok = (bool)wp_mail(
-        $to,
+        $recipients,
         $subject,
         $body,
         cmsf_mail_headers($is_html)
@@ -223,7 +216,7 @@ function cmsf_send_site($site_id, $template_id) {
             'site_id'     => $site_id,
             'list_id'     => (int)$site['list_id'],
             'template_id' => $template_id,
-            'email'       => $to,
+            'email'       => implode(', ', $recipients),
             'sent_at'     => $now,
             'ok'          => $ok ? 1 : 0,
             'error'       => $error,

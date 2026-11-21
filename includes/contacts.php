@@ -1288,7 +1288,9 @@ function cmsfc_admin_page() {
 
             <p id="cmsfc-email-info">Виберіть список, щоб переглянути його адреси.</p>
 
-            <div class="cmsfc-table-wrap">
+            <details class="cmsfc-email-details">
+                <summary>Розгорнути список email</summary>
+                <div class="cmsfc-table-wrap">
                 <table class="widefat striped" id="cmsfc-email-table">
                     <thead>
                         <tr>
@@ -1303,7 +1305,8 @@ function cmsfc_admin_page() {
                         <tr><td colspan="5">Адреси ще не завантажені.</td></tr>
                     </tbody>
                 </table>
-            </div>
+                </div>
+            </details>
 
             <div class="cmsfc-actions">
                 <button type="button" class="button" id="cmsfc-email-prev">← Назад</button>

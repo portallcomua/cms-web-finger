@@ -18,7 +18,7 @@ function cmsf_split_terms($v) {
 function cmsf_region_suffixes($regions) {
     $s = [];
     if (!$regions || in_array('world', $regions, true)) $s[] = '';
-    if (in_array('ua', $regions, true)) $s[] = 'site:.ua';
+    if (in_array('ua', $regions, true)) $s[] = '(site:.ua OR site:.com.ua OR site:.org.ua OR site:.net.ua OR site:.in.ua OR site:.biz.ua OR site:.co.ua OR site:.gov.ua OR site:.edu.ua OR site:.укр OR site:xn--j1amh)';
     if (in_array('eu', $regions, true)) $s[] = '(site:.eu OR site:.de OR site:.pl OR site:.fr OR site:.it OR site:.es)';
     if (in_array('us', $regions, true)) $s[] = '(site:.us OR "United States")';
     return $s ?: [''];
@@ -154,6 +154,11 @@ function cmsf_extract_domains($html, $engine) {
 }
 
 // Повертає ['domains'=>[...]] або ['error'=>'...']
+function cmsf_is_ua_domain($domain) {
+    $domain = strtolower(rtrim((string)$domain, '.'));
+    return (bool)preg_match('/(?:^|\\.)(?:ua|укр|xn--j1amh)$/u', $domain);
+}
+
 function cmsf_engine_search($engine, $q, $ua, $page) {
     $url = cmsf_engine_url($engine, $q, $ua, $page);
     if (!$url) return ['error' => 'Невідоме джерело'];
@@ -162,7 +167,7 @@ function cmsf_engine_search($engine, $q, $ua, $page) {
     if (!$r['ok']) return ['error' => $r['error'] ?: 'Немає відповіді', 'blocked' => in_array($r['code'], [403, 429], true)];
     if (preg_match('/unusual traffic|captcha|verify you are human|access denied|anomaly-modal|are you a robot/i', substr($r['body'], 0, 50000))) return ['error' => 'джерело показало перевірку або блокування', 'blocked' => true];
     $domains = cmsf_extract_domains($r['body'], $engine);
-    if ($ua) $domains = array_values(array_filter($domains, function ($d) { return substr($d, -3) === '.ua'; }));
+    if ($ua) $domains = array_values(array_filter($domains, 'cmsf_is_ua_domain'));
     return ['domains' => $domains];
 }
 
@@ -171,7 +176,7 @@ const CMSF_MAJESTIC_URL = 'https://downloads.majestic.com/majestic_million.csv';
 
 function cmsf_zones() {
     return [
-        'ua' => ['ua'],
+        'ua' => ['ua', 'укр', 'xn--j1amh'],
         'eu' => ['at', 'be', 'bg', 'hr', 'cy', 'cz', 'dk', 'ee', 'fi', 'fr', 'de', 'gr', 'hu', 'ie', 'it', 'lv', 'lt', 'lu', 'mt', 'nl', 'pl', 'pt', 'ro', 'sk', 'si', 'es', 'se', 'eu', 'no', 'ch', 'is', 'li'],
         'us' => ['us'],
         'world' => null,

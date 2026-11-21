@@ -60,6 +60,9 @@ function cmsf_filters_from_post() {
         'state' => in_array(cmsf_post('state', 'ok'), ['ok', 'queued', 'rejected', 'failed', 'all'], true) ? cmsf_post('state', 'ok') : 'ok',
         'q' => sanitize_text_field(cmsf_post('q')),
         'has_email' => !empty($_POST['has_email']) ? 1 : 0,
+        'notes' => in_array(cmsf_post('notes'), ['with', 'without'], true) ? cmsf_post('notes') : '',
+        'order_by' => in_array(cmsf_post('order_by'), ['domain','cms','version','country','language','email','phone','note','sent_at'], true) ? cmsf_post('order_by') : 'id',
+        'order_dir' => strtoupper(cmsf_post('order_dir')) === 'ASC' ? 'ASC' : 'DESC',
         'sent' => in_array(cmsf_post('sent'), ['unsent', 'sent', 'failed'], true) ? cmsf_post('sent') : '',
         'outdated' => !empty($_POST['outdated']) ? 1 : 0,
         'cms' => sanitize_text_field(cmsf_post('cms_filter')),
@@ -79,6 +82,8 @@ function cmsf_where($list_id, $f) {
         array_push($a, $like, $like, $like, $like);
     }
     if (!empty($f['has_email'])) $w[] = "email<>''";
+    if (($f['notes'] ?? '') === 'with') $w[] = "note<>''";
+    if (($f['notes'] ?? '') === 'without') $w[] = "(note IS NULL OR note='')";
     if (($f['sent'] ?? '') === 'unsent') $w[] = 'sent_at IS NULL';
     if (($f['sent'] ?? '') === 'sent') $w[] = 'send_ok=1';
     if (($f['sent'] ?? '') === 'failed') $w[] = 'send_ok=0';
@@ -132,9 +137,13 @@ cmsf_ajax('rows', function () {
     list($where, $args) = cmsf_where($id, cmsf_filters_from_post());
     $t = cmsf_t('sites');
     $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE $where", $args));
-    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    $filters = cmsf_filters_from_post();
+    $allowed_sort = ['domain','cms','version','country','language','email','phone','note','sent_at','id'];
+    $sort = in_array($filters['order_by'], $allowed_sort, true) ? $filters['order_by'] : 'id';
+    $dir = $filters['order_dir'] === 'ASC' ? 'ASC' : 'DESC';
+    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY `$sort` $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
     $cms_list = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT cms FROM $t WHERE list_id=%d AND state='ok' AND cms<>'' ORDER BY cms", $id));
-    wp_send_json_success(['rows' => array_map('cmsf_row_out', $rows), 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list]);
+    wp_send_json_success(['rows' => array_map('cmsf_row_out', $rows), 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list, 'note_suggestions' => array_slice((array)get_option('cmsf_note_history', []), 0, 30)]);
 });
 
 cmsf_ajax('ids', function () {
@@ -149,13 +158,34 @@ cmsf_ajax('row_update', function () {
     $id = (int)cmsf_post('id');
     $field = cmsf_post('field');
     $val = cmsf_post('value');
-    if ($field === 'note') $data = ['note' => sanitize_textarea_field($val)];
-    elseif ($field === 'email') {
-        $e = sanitize_email($val);
-        if ($val !== '' && !is_email($e)) wp_send_json_error('Некоректний email');
-        $data = ['email' => $e];
+    $site = cmsf_site_row($id);
+    if (!$site) wp_send_json_error('Сайт не знайдено');
+    if ($field === 'note') {
+        $note = sanitize_textarea_field($val);
+        if ($note !== '' && $note !== (string)$site['note']) {
+            $note = preg_replace('/^\[\d{2}\.\d{2}\.\d{4}(?: \d{2}:\d{2})?\]\s*/', '', $note);
+            $note = '[' . wp_date('d.m.Y H:i') . '] ' . $note;
+        }
+        // Нотатка спільна для всіх входжень домену в різних списках.
+        $wpdb->update(cmsf_t('sites'), ['note' => $note], ['domain' => $site['domain']]);
+        if ($note !== '') {
+            $history = get_option('cmsf_note_history', []);
+            if (!is_array($history)) $history = [];
+            $plain = preg_replace('/^\[\d{2}\.\d{2}\.\d{4}(?: \d{2}:\d{2})?\]\s*/', '', $note);
+            $history = array_values(array_unique(array_slice(array_merge([$plain], $history), 0, 30)));
+            update_option('cmsf_note_history', $history, false);
+        }
+    } elseif ($field === 'email') {
+        $parts = preg_split('/[,;\s]+/', (string)$val, -1, PREG_SPLIT_NO_EMPTY);
+        $emails = [];
+        foreach ($parts as $part) {
+            $e = strtolower(sanitize_email(trim($part)));
+            if (!is_email($e)) wp_send_json_error('Некоректна email-адреса: ' . sanitize_text_field($part));
+            $emails[$e] = $e;
+        }
+        $data = ['email' => implode(', ', array_values($emails))];
+        $wpdb->update(cmsf_t('sites'), $data, ['id' => $id]);
     } else wp_send_json_error('Невідоме поле');
-    $wpdb->update(cmsf_t('sites'), $data, ['id' => $id]);
     wp_send_json_success();
 });
 
