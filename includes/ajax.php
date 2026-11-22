@@ -66,6 +66,8 @@ function cmsf_filters_from_post() {
         'sent' => in_array(cmsf_post('sent'), ['unsent', 'sent', 'failed'], true) ? cmsf_post('sent') : '',
         'outdated' => !empty($_POST['outdated']) ? 1 : 0,
         'cms' => sanitize_text_field(cmsf_post('cms_filter')),
+        'version_min' => preg_replace('/[^0-9.]/', '', (string)cmsf_post('version_min')),
+        'version_max' => preg_replace('/[^0-9.]/', '', (string)cmsf_post('version_max')),
     ];
 }
 
@@ -89,6 +91,20 @@ function cmsf_where($list_id, $f) {
     if (($f['sent'] ?? '') === 'failed') $w[] = 'send_ok=0';
     if (!empty($f['outdated'])) $w[] = 'outdated=1';
     if (!empty($f['cms'])) { $w[] = 'cms=%s'; $a[] = $f['cms']; }
+    // Numeric semantic version key: major * 1,000,000 + minor * 1,000 + patch.
+    $version_key = "(
+        CAST(SUBSTRING_INDEX(version,'.',1) AS UNSIGNED) * 1000000 +
+        CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',2),'.',-1) AS UNSIGNED) * 1000 +
+        CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',3),'.',-1) AS UNSIGNED)
+    )";
+    foreach (['version_min' => '>=', 'version_max' => '<='] as $key => $op) {
+        if (!empty($f[$key]) && preg_match('/^\\d+(?:\\.\\d+){0,2}$/', $f[$key])) {
+            $parts = array_map('intval', explode('.', $f[$key]));
+            $bound = ($parts[0] ?? 0) * 1000000 + ($parts[1] ?? 0) * 1000 + ($parts[2] ?? 0);
+            $w[] = "$version_key $op %d";
+            $a[] = $bound;
+        }
+    }
     return [implode(' AND ', $w), $a];
 }
 
