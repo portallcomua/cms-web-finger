@@ -55,3 +55,8 @@ jobs:
           wp plugin deactivate cms-web-finder --path=wordpress --allow-root
           wp plugin activate cms-web-finder --path=wordpress --allow-root
           wp eval 'global $wpdb; $n=(int)$wpdb->get_var("SELECT COUNT(*) FROM " . cmsf_t("sites") . " WHERE domain=\"shared.example.ua\""); if ($n !== 2) { fwrite(STDERR, "Data lost after deactivate/activate" . PHP_EOL); exit(1); }' --path=wordpress --allow-root
+          mkdir -p /tmp/uawf-package
+          cp -R wordpress/wp-content/plugins/cms-web-finder /tmp/uawf-package/
+          (cd /tmp/uawf-package && zip -qr /tmp/ua-web-finder.zip cms-web-finder)
+          wp plugin install /tmp/ua-web-finder.zip --force --activate --path=wordpress --allow-root
+          wp eval 'global $wpdb; $n=(int)$wpdb->get_var("SELECT COUNT(*) FROM " . cmsf_t("sites") . " WHERE domain=\"shared.example.ua\""); if ($n !== 2) { fwrite(STDERR, "Data lost after ZIP update" . PHP_EOL); exit(1); }' --path=wordpress --allow-root
