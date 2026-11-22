@@ -109,7 +109,7 @@
         </div>
       </div>
       <div class="cmsf-table-wrap"><table class="cmsf-table"><thead><tr>
-        <th class="c-sel"></th><th><button type="button" class="cmsf-sort" data-sort="domain">Сайт ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="cms">CMS ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="country">Країна / мова ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="email">Email ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="phone">Телефон ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="note">Нотатка ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="sent_at">Відправлено ↕</button></th><th></th>
+        <th class="c-sel"></th><th><button type="button" class="cmsf-sort" data-sort="domain">Сайт ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="cms">CMS ↕</button> / <button type="button" class="cmsf-sort" data-sort="version">Версія ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="country">Країна / мова ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="email">Email ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="phone">Телефон ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="note">Нотатка ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="sent_at">Відправлено ↕</button></th><th></th>
       </tr></thead><tbody></tbody></table></div>
       <div class="cmsf-pager"><button type="button" class="button p-prev">←</button><span class="p-info"></span><button type="button" class="button p-next">→</button></div>`;
     const q = s => $(s, root);
