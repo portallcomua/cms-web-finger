@@ -40,7 +40,7 @@ function cmsf_install() {
   language varchar(120) NOT NULL DEFAULT '',
   site_type varchar(60) NOT NULL DEFAULT '',
   relevance int(11) NOT NULL DEFAULT 0,
-  email varchar(255) NOT NULL DEFAULT '',
+  email text NULL,
   emails text NULL,
   phone varchar(255) NOT NULL DEFAULT '',
   note text NULL,
@@ -127,7 +127,6 @@ function cmsf_seed_presets() {
 function cmsf_migrate_old() {
     global $wpdb;
     if (get_option('cmsf_migrated')) return;
-    update_option('cmsf_migrated', 1);
     $old = get_option('cms_checker_results', []);
     $notes = get_option('cms_checker_notes', []);
     $tpl = get_option('cms_checker_template', '');
@@ -149,6 +148,9 @@ function cmsf_migrate_old() {
     if ($tpl) {
         $wpdb->insert(cmsf_t('templates'), ['name' => 'Шаблон зі старої версії', 'topic' => 'Імпорт', 'subject' => 'Пропозиція щодо сайту {domain}', 'body' => $tpl, 'is_html' => 0, 'created_at' => $now, 'updated_at' => $now]);
     }
+
+    // Позначаємо міграцію завершеною лише після виконання всіх операцій.
+    if (empty($wpdb->last_error)) update_option('cmsf_migrated', 1, false);
 }
 
 function cmsf_defaults() {
@@ -215,6 +217,37 @@ function cmsf_list_delete($id) {
     $wpdb->delete(cmsf_t('lists'), ['id' => $id]);
 }
 
+/**
+ * Save one domain note to every occurrence of that domain across all lists.
+ * Returns the saved note or false when the site ID does not exist.
+ */
+function cmsf_note_save($site_id, $value) {
+    global $wpdb;
+    $site = $wpdb->get_row(
+        $wpdb->prepare("SELECT domain, note FROM " . cmsf_t('sites') . " WHERE id=%d", (int)$site_id),
+        ARRAY_A
+    );
+    if (!$site) return false;
+
+    $note = sanitize_textarea_field((string)$value);
+    if ($note !== '' && $note !== (string)$site['note']) {
+        $note = preg_replace('/^\\[\\d{2}\\.\\d{2}\\.\\d{4}(?: \\d{2}:\\d{2})?\\]\\s*/', '', $note);
+        $note = '[' . wp_date('d.m.Y H:i') . '] ' . $note;
+    }
+
+    $updated = $wpdb->update(cmsf_t('sites'), ['note' => $note], ['domain' => $site['domain']]);
+    if ($updated === false) return false;
+
+    if ($note !== '') {
+        $history = get_option('cmsf_note_history', []);
+        if (!is_array($history)) $history = [];
+        $plain = preg_replace('/^\\[\\d{2}\\.\\d{2}\\.\\d{4}(?: \\d{2}:\\d{2})?\\]\\s*/', '', $note);
+        $history = array_values(array_unique(array_slice(array_merge([$plain], $history), 0, 30)));
+        update_option('cmsf_note_history', $history, false);
+    }
+    return $note;
+}
+
 // Додає домени в чергу списку. Повертає кількість нових.
 function cmsf_add_queued($list_id, $domains) {
     global $wpdb;
@@ -223,6 +256,8 @@ function cmsf_add_queued($list_id, $domains) {
     foreach (array_unique($domains) as $d) {
         $d = cmsf_norm_domain($d);
         if (!$d || strpos($d, '.') === false) continue;
+        // Один домен може входити до кількох списків. У межах поточного
+        // списку повтори відсікає UNIQUE KEY (list_id, domain) та INSERT IGNORE.
         $values[] = $wpdb->prepare("(%d,%s,%s,'queued')", $list_id, $d, 'https://' . $d);
     }
     $added = 0;
@@ -256,7 +291,15 @@ function cmsf_template_save($id, $data) {
         'updated_at' => cmsf_now(),
     ];
     if ($row['name'] === '') $row['name'] = 'Без назви';
-    if (!empty($row['is_html'])) $row['body'] = wp_kses_post($row['body']);
+    if (!empty($row['is_html'])) {
+        $row['body'] = wp_kses_post($row['body']);
+    } else {
+        // TinyMCE returns HTML even when the sender chooses plain text.
+        // Convert block boundaries to newlines before stripping markup.
+        $plain = preg_replace('#<br\\s*/?>#i', "\n", $row['body']);
+        $plain = preg_replace('#</(?:p|div|h[1-6]|li|tr)>#i', "\n", $plain);
+        $row['body'] = sanitize_textarea_field(html_entity_decode(wp_strip_all_tags($plain), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
     if ($id) {
         $wpdb->update(cmsf_t('templates'), $row, ['id' => $id]);
         return $id;

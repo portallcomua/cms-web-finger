@@ -59,7 +59,7 @@
 
   // ============ КОМПОНЕНТ «СПИСОК САЙТІВ» ============
   function createListView(root, listId) {
-    const S = { page: 1, pages: 1, total: 0, sel: new Set(), rows: {}, stats: {}, tpls: [], sending: false, stopSend: false, verifying: false };
+    const S = { page: 1, pages: 1, total: 0, sel: new Set(), rows: {}, stats: {}, tpls: [], sending: false, stopSend: false, verifying: false, order_by: 'id', order_dir: 'DESC', noteSuggestions: [] };
     root.innerHTML = `
       <div class="cmsf-lv-stats"></div>
       <div class="cmsf-lv-filters">
@@ -67,7 +67,10 @@
         <select class="f-state"><option value="ok">Знайдені</option><option value="queued">У черзі</option><option value="rejected">Відхилені</option><option value="failed">Недоступні</option><option value="all">Усі</option></select>
         <select class="f-sent"><option value="">Відправка: усі</option><option value="unsent">Ще не надсилали</option><option value="sent">Надіслано успішно</option><option value="failed">Помилка відправки</option></select>
         <select class="f-cms"><option value="">Усі CMS</option></select>
+        <label><span>Версія від</span><input type="text" class="f-version-min" placeholder="1.5"></label>
+        <label><span>Версія до</span><input type="text" class="f-version-max" placeholder="6.00"></label>
         <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>
+        <select class="f-notes"><option value="">Нотатки: усі</option><option value="with">З нотатками</option><option value="without">Без нотаток</option></select>
         <label class="cmsf-chk"><input type="checkbox" class="f-outdated"> Застаріла версія</label>
       </div>
       <div class="cmsf-lv-actions">
@@ -96,7 +99,7 @@
             <label><span>Назва шаблону</span><input type="text" class="n-name"></label>
             <label><span>Тема (група)</span><input type="text" class="n-topic" placeholder="Joomla, WordPress, Плагіни…"></label>
             <label class="cmsf-wide"><span>Тема листа</span><input type="text" class="n-subject"></label>
-            <label class="cmsf-wide"><span>Текст листа (змінні: {url} {domain} {site_title} {cms} {version} {latest_version})</span><textarea class="n-body" rows="6"></textarea></label>
+            <label class="cmsf-wide"><span>Текст листа (змінні: {url} {domain} {site} {site_title} {cms} {version} {latest_version})</span><textarea class="n-body" rows="6"></textarea></label><fieldset class="cmsf-wide"><legend>Формат листа</legend><label><input type="radio" name="n-is-html" value="0" checked> Звичайний текст</label> <label><input type="radio" name="n-is-html" value="1"> HTML</label></fieldset>
           </div>
           <button type="button" class="button button-primary n-save">Зберегти шаблон</button> <button type="button" class="button n-saveas" hidden>Зберегти як новий</button> <button type="button" class="button n-cancel">Скасувати</button> <span class="cmsf-msg n-msg"></span>
         </div>
@@ -106,12 +109,12 @@
         </div>
       </div>
       <div class="cmsf-table-wrap"><table class="cmsf-table"><thead><tr>
-        <th class="c-sel"></th><th>Сайт</th><th>CMS</th><th>Країна / мова</th><th>Email</th><th>Телефон</th><th>Нотатка</th><th>Відправлено</th><th></th>
+        <th class="c-sel"></th><th><button type="button" class="cmsf-sort" data-sort="domain">Сайт ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="cms">CMS ↕</button> / <button type="button" class="cmsf-sort" data-sort="version">Версія ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="country">Країна ↕</button> / <button type="button" class="cmsf-sort" data-sort="language">Мова ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="email">Email ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="phone">Телефон ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="note">Нотатка ↕</button></th><th><button type="button" class="cmsf-sort" data-sort="sent_at">Відправлено ↕</button></th><th></th>
       </tr></thead><tbody></tbody></table></div>
       <div class="cmsf-pager"><button type="button" class="button p-prev">←</button><span class="p-info"></span><button type="button" class="button p-next">→</button></div>`;
     const q = s => $(s, root);
     const tbody = q('tbody');
-    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '' });
+    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '', notes: q('.f-notes').value, version_min: q('.f-version-min').value.trim(), version_max: q('.f-version-max').value.trim(), order_by: S.order_by, order_dir: S.order_dir });
     const msg = t => { q('.lv-msg').textContent = t || ''; };
 
     function sentCell(r) {
@@ -122,14 +125,15 @@
     function rowHtml(r) {
       const cms = r.cms ? `<b>${esc(r.cms)}</b>${r.version ? ' <span class="cmsf-ver">' + esc(r.version) + '</span>' : ''}${r.outdated ? ' <span class="cmsf-badge" title="Остання версія: ' + esc(r.latest) + '">застаріла</span>' : ''}` : '—';
       const sub = r.state !== 'ok' ? `<div class="cmsf-sub">${esc(STATE[r.state] || r.state)}${r.reject_reason ? ': ' + esc(r.reject_reason) : ''}</div>` : (r.title ? `<div class="cmsf-sub">${esc(r.title)}</div>` : '');
+      const listInfo = Number(r.list_count) > 1 ? `<div class="cmsf-sub">Збережено у списках: ${esc(r.list_names || '')}</div>` : '';
       return `<tr data-id="${r.id}" class="${S.sel.has(r.id) ? 'is-sel' : ''}">
         <td class="c-sel"><input type="checkbox" class="row-sel" ${S.sel.has(r.id) ? 'checked' : ''}></td>
-        <td data-label="Сайт"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.domain)}</a>${sub}</td>
+        <td data-label="Сайт"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.domain)}</a>${sub}${listInfo}</td>
         <td data-label="CMS">${cms}</td>
         <td data-label="Країна / мова">${esc(r.country || '—')}<div class="cmsf-sub">${esc(r.language || '')}</div></td>
         <td data-label="Email"><input type="text" class="inp-email" value="${esc(r.email)}" placeholder="email"></td>
         <td data-label="Телефон">${esc(r.phone || '—')}</td>
-        <td data-label="Нотатка"><input type="text" class="inp-note" value="${esc(r.note || '')}" placeholder="нотатка"></td>
+        <td data-label="Нотатка"><div class="cmsf-note-wrap"><textarea class="inp-note" rows="2" placeholder="Нотатка (автодата)">${esc(r.note || '')}</textarea><div class="cmsf-note-suggest" hidden></div></div></td>
         <td data-label="Відправлено" class="c-sent">${sentCell(r)}</td>
         <td class="c-act"><button type="button" class="button row-del" title="Видалити">✕</button></td></tr>`;
     }
@@ -162,8 +166,11 @@
     async function load(page) {
       if (page) S.page = page;
       const d = await api('rows', Object.assign({ list_id: listId, page: S.page }, filters()));
-      S.total = d.total; S.pages = d.pages; S.page = d.page; S.stats = d.stats; S.rows = {};
+      S.total = d.total; S.pages = d.pages; S.page = d.page; S.stats = d.stats; S.rows = {}; S.noteSuggestions = d.note_suggestions || [];
       d.rows.forEach(r => { S.rows[r.id] = r; });
+      let dl = q('#cmsf-note-suggestions');
+      if (!dl) { dl = document.createElement('datalist'); dl.id = 'cmsf-note-suggestions'; root.appendChild(dl); }
+      dl.innerHTML = S.noteSuggestions.map(v => '<option value="' + esc(v) + '"></option>').join('');
       tbody.innerHTML = d.rows.length ? d.rows.map(rowHtml).join('') : '<tr><td colspan="9" class="cmsf-empty">Тут поки нічого немає</td></tr>';
       const cs = q('.f-cms'), cur = cs.value;
       cs.innerHTML = '<option value="">Усі CMS</option>' + d.cms_list.map(c => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
@@ -172,13 +179,42 @@
       renderStats(); renderSel();
     }
 
-    // --- події ---
+    // Підказки раніше використаних нотаток за першими літерами.
+    tbody.addEventListener('input', e => {
+      if (!e.target.classList.contains('inp-note')) return;
+      const wrap = e.target.closest('.cmsf-note-wrap');
+      const menu = wrap.querySelector('.cmsf-note-suggest');
+      const query = e.target.value.trim().toLocaleLowerCase();
+      if (query.length < 1) { menu.hidden = true; return; }
+      const matches = S.noteSuggestions.filter(v => v.toLocaleLowerCase().startsWith(query)).slice(0, 8);
+      menu.innerHTML = matches.map(v => '<button type="button" class="cmsf-note-suggestion" data-value="' + esc(v) + '">' + esc(v) + '</button>').join('');
+      menu.hidden = !matches.length;
+    });
     let t;
     q('.f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(1), 350); });
-    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated'].forEach(s => q(s).addEventListener('change', () => load(1)));
+    ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(sel => q(sel).addEventListener('change', () => load(1)));
+    ['.f-version-min', '.f-version-max'].forEach(sel => q(sel).addEventListener('change', () => load(1)));
+    $$('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => {
+      const key = b.dataset.sort;
+      S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC';
+      S.order_by = key;
+      load(1);
+    }));
     q('.p-prev').onclick = () => load(S.page - 1);
     q('.p-next').onclick = () => load(S.page + 1);
+    const autosaveTimers = new WeakMap();
+    tbody.addEventListener('input', e => {
+      if (!e.target.classList.contains('inp-note') && !e.target.classList.contains('inp-email')) return;
+      clearTimeout(autosaveTimers.get(e.target));
+      autosaveTimers.set(e.target, setTimeout(() => {
+        e.target.dispatchEvent(new Event('change', { bubbles: true }));
+      }, 900));
+    });
     tbody.addEventListener('change', e => {
+      if (autosaveTimers.has(e.target)) {
+        clearTimeout(autosaveTimers.get(e.target));
+        autosaveTimers.delete(e.target);
+      }
       const tr = e.target.closest('tr'); if (!tr) return;
       const id = Number(tr.dataset.id);
       if (e.target.classList.contains('row-sel')) { e.target.checked ? S.sel.add(id) : S.sel.delete(id); renderSel(); }
@@ -188,6 +224,15 @@
       }
     });
     tbody.addEventListener('click', e => {
+      const suggestion = e.target.closest('.cmsf-note-suggestion');
+      if (suggestion) {
+        const wrap = suggestion.closest('.cmsf-note-wrap');
+        const field = wrap.querySelector('.inp-note');
+        field.value = suggestion.dataset.value;
+        wrap.querySelector('.cmsf-note-suggest').hidden = true;
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
       const b = e.target.closest('.row-del'); if (!b) return;
       const id = Number(b.closest('tr').dataset.id);
       if (confirm('Видалити цей сайт зі списку?')) api('rows_delete', { ids: [id] }).then(() => { S.sel.delete(id); load(); });
@@ -240,7 +285,7 @@
     S.editId = 0;
     const fillEditor = t => {
       q('.n-name').value = t ? t.name : ''; q('.n-topic').value = t ? t.topic : ''; q('.n-subject').value = t ? t.subject : ''; q('.n-body').value = t ? t.body : '';
-      S.editId = t ? Number(t.id) : 0; S.editHtml = t ? t.is_html : 0;
+      S.editId = t ? Number(t.id) : 0; S.editHtml = t ? Number(t.is_html) : 0; root.querySelectorAll('input[name="n-is-html"]').forEach(r => { r.checked = r.value === String(S.editHtml); });
       q('.n-save').textContent = t ? 'Зберегти зміни' : 'Зберегти шаблон';
       q('.n-saveas').hidden = !t; q('.n-msg').textContent = ''; q('.s-new').hidden = false;
     };
@@ -260,7 +305,7 @@
     const saveTpl = async asNew => {
       const m = q('.n-msg');
       try {
-        const r = await api('tpl_save', { id: asNew ? 0 : S.editId, name: q('.n-name').value, topic: q('.n-topic').value, subject: q('.n-subject').value, body: q('.n-body').value, is_html: asNew ? '' : (Number(S.editHtml) ? 1 : '') });
+        const r = await api('tpl_save', { id: asNew ? 0 : S.editId, name: q('.n-name').value, topic: q('.n-topic').value, subject: q('.n-subject').value, body: q('.n-body').value, is_html: root.querySelector('input[name="n-is-html"]:checked').value });
         await loadTpls(r.id); q('.s-new').hidden = true; msg('Шаблон збережено і вибрано');
       } catch (e) { m.textContent = e.message; }
     };
@@ -512,10 +557,10 @@
     const form = $('#cmsf-tpl-form'), msg = $('#cmsf-tpl-msg');
     let tpls = [];
     const say = (t, bad) => { msg.textContent = t; msg.className = 'cmsf-msg' + (bad ? ' cmsf-bad' : ''); };
-    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: form.elements.body.value, is_html: form.elements.is_html.checked ? 1 : '' });
+    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: (window.tinymce && window.tinymce.get('cmsf_tpl_body')) ? window.tinymce.get('cmsf_tpl_body').getContent() : form.elements.body.value, is_html: form.querySelector('input[name="is_html"]:checked').value === '1' ? 1 : 0 });
     function fill(t) {
       form.elements.id.value = t ? t.id : 0; form.elements.name.value = t ? t.name : ''; form.elements.topic.value = t ? t.topic : '';
-      form.elements.subject.value = t ? t.subject : ''; form.elements.body.value = t ? t.body : ''; form.elements.is_html.checked = !!(t && Number(t.is_html));
+      form.elements.subject.value = t ? t.subject : ''; if (window.tinymce && window.tinymce.get('cmsf_tpl_body')) window.tinymce.get('cmsf_tpl_body').setContent(t ? t.body : ''); else form.elements.body.value = t ? t.body : ''; Array.from(form.querySelectorAll('input[name="is_html"]')).forEach(r => { r.checked = r.value === (t && Number(t.is_html) ? '1' : '0'); });
       $('#cmsf-tpl-prev').hidden = true; say('');
       $$('.cmsf-tpl-item').forEach(i => i.classList.toggle('active', t && i.dataset.id === String(t.id)));
     }

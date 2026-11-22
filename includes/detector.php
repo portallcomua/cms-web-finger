@@ -171,15 +171,15 @@ function cmsf_fetch_latest() {
         if (!empty($j['offers'][0]['current'])) $out['WordPress'] = $j['offers'][0]['current'];
     }
     foreach (['Joomla' => 'joomla/joomla-cms', 'Drupal' => 'drupal/drupal'] as $k => $repo) {
-        $r = wp_remote_get("https://api.github.com/repos/$repo/tags?per_page=100", ['timeout' => 8, 'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'cms-web-finder']]);
-        if (is_wp_error($r)) continue;
-        $j = json_decode(wp_remote_retrieve_body($r), true);
-        $best = '';
-        if (is_array($j)) foreach ($j as $t) {
-            $n = ltrim((string)($t['name'] ?? ''), 'v');
-            if (preg_match('/^\d+\.\d+(\.\d+)?$/', $n) && ($best === '' || version_compare($n, $best, '>'))) $best = $n;
-        }
-        $out[$k] = $best;
+        // Беремо останній стабільний реліз, а не найбільший тег (у тегах можуть бути гілки та службові версії).
+        $r = wp_remote_get("https://api.github.com/repos/$repo/releases/latest", [
+            'timeout' => 8,
+            'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'ua-web-finder']
+        ]);
+        if (is_wp_error($r) || (int)wp_remote_retrieve_response_code($r) !== 200) continue;
+        $release = json_decode(wp_remote_retrieve_body($r), true);
+        $tag = ltrim((string)($release['tag_name'] ?? ''), 'v');
+        if (preg_match('/^\d+\.\d+(?:\.\d+)?$/', $tag)) $out[$k] = $tag;
     }
     return $out;
 }
@@ -191,10 +191,10 @@ function cmsf_latest($cms) {
     $s = cmsf_settings();
     $manual = trim((string)($s['latest_' . strtolower($key)] ?? ''));
     if ($manual !== '') return $manual;
-    $cache = get_transient('cmsf_latest_cache');
+    $cache = get_transient('cmsf_latest_cache_v2');
     if ($cache === false) {
         $cache = cmsf_fetch_latest();
-        set_transient('cmsf_latest_cache', $cache, array_filter($cache) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
+        set_transient('cmsf_latest_cache_v2', $cache, array_filter($cache) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
     }
     return (string)($cache[$key] ?? '');
 }
@@ -220,6 +220,12 @@ function cmsf_detect_langs($html, $text) {
     $set = [];
     if (preg_match('/<html[^>]*\blang=["\']?([a-zA-Z-]+)/i', $html, $m)) $set[] = strtolower(substr($m[1], 0, 2));
     if (preg_match_all('/hreflang=["\']([a-zA-Z-]+)["\']/i', $html, $mm)) foreach ($mm[1] as $x) $set[] = strtolower(substr($x, 0, 2));
+    // Якщо сайт не декларує lang/hreflang, визначаємо мову за текстовими
+    // ознаками. Це дозволяє знаходити україномовні UA-сайти зі старими темами.
+    if (!$set) {
+        $inferred = cmsf_text_lang($text);
+        if ($inferred !== '') $set[] = $inferred;
+    }
     return array_values(array_unique(array_filter($set, function ($x) { return preg_match('/^[a-z]{2}$/', $x); })));
 }
 
@@ -231,7 +237,7 @@ function cmsf_detect_country($domain, $text, $phones, $html_lang, $langs) {
     $tld = strtolower(substr(strrchr($domain, '.') ?: '', 1));
     $sig = [];
     $code = '';
-    if ($tld === 'ua') { $code = 'UA'; $sig[] = '.ua'; }
+    if (cmsf_is_ua_domain($domain)) { $code = 'UA'; $sig[] = 'український домен'; }
     foreach ($phones as $p) {
         $d = preg_replace('/\D/', '', $p);
         if (strpos($d, '380') === 0 && strlen($d) === 12) { $code = $code ?: 'UA'; $sig[] = '+380'; break; }
@@ -247,7 +253,7 @@ function cmsf_detect_country($domain, $text, $phones, $html_lang, $langs) {
     elseif ($weak) $label = 'Невизначено (лише українська мова)';
     elseif ($code) $label = 'Інша (' . $code . ')';
     else $label = 'Невідомо';
-    return ['code' => $code, 'europe' => $europe, 'ua_domain' => $tld === 'ua', 'label' => $label];
+    return ['code' => $code, 'europe' => $europe, 'ua_domain' => cmsf_is_ua_domain($domain), 'label' => $label];
 }
 
 function cmsf_site_type($html, $title, $text, $cms) {
@@ -302,7 +308,7 @@ function cmsf_extract_contacts($html, $text) {
         $n = strlen(preg_replace('/\D/', '', $p));
         if ($n >= 9 && $n <= 15) $ph[$p] = true;
     }
-    return ['emails' => array_slice(array_keys($clean), 0, 10), 'phones' => array_slice(array_keys($ph), 0, 6)];
+    return ['emails' => array_keys($clean), 'phones' => array_slice(array_keys($ph), 0, 6)];
 }
 
 // Основний email: спершу з домену самого сайту, потім решта
@@ -427,29 +433,37 @@ function cmsf_inspect($domain, $params) {
         $rec['latest'] = cmsf_latest($cms);
         $rec['outdated'] = cmsf_is_outdated($rec['version'], $rec['latest']) ? 1 : 0;
     }
-    if (!$contacts['emails'] && !$contacts['phones']) {
-        $paths = [];
-        if (preg_match_all('#<a\b[^>]*href=["\']([^"\'\#]+)["\'][^>]*>(.*?)</a>#is', $html, $mm, PREG_SET_ORDER)) {
-            foreach ($mm as $a) {
-                if (preg_match('/contact|контакт|зв\'яз|про нас|about/iu', wp_strip_all_tags($a[2]) . ' ' . $a[1])) {
-                    $href = $a[1];
-                    if (preg_match('#^https?://#i', $href)) { if (cmsf_norm_domain($href) !== $domain) continue; $paths[] = $href; }
-                    elseif (strpos($href, '//') !== 0 && strpos($href, 'mailto:') !== 0 && strpos($href, 'tel:') !== 0 && strpos($href, 'javascript:') !== 0) $paths[] = $base . '/' . ltrim($href, '/');
-                    break;
-                }
+    // Додатково перевіряємо сторінки контактів навіть тоді, коли email є на
+    // головній: різні адреси (відділи продажу, підтримка, бухгалтерія) часто
+    // розміщені на різних сторінках. Обмежуємо кількість URL і час запитів.
+    $paths = [];
+    if (preg_match_all('#<a\b[^>]*href=["\']([^"\'\#]+)["\'][^>]*>(.*?)</a>#is', $html, $mm, PREG_SET_ORDER)) {
+        foreach ($mm as $a) {
+            if (!preg_match('/contact|контакт|зв\'яз|про нас|about/iu', wp_strip_all_tags($a[2]) . ' ' . $a[1])) continue;
+            $href = html_entity_decode($a[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (preg_match('#^https?://#i', $href)) {
+                if (cmsf_norm_domain($href) !== $domain) continue;
+                $paths[] = $href;
+            } elseif (strpos($href, '//') !== 0 && strpos($href, 'mailto:') !== 0 && strpos($href, 'tel:') !== 0 && strpos($href, 'javascript:') !== 0) {
+                $paths[] = $base . '/' . ltrim($href, '/');
             }
-        }
-        foreach (array_merge($paths, [$base . '/contacts', $base . '/contact', $base . '/kontakty']) as $u) {
-            if ($left() < 7) break;
-            $r2 = cmsf_http_get($u, 5);
-            if (!$r2['ok'] || $r2['body'] === '') continue;
-            $h2 = cmsf_to_utf8($r2['body'], $r2['ctype']);
-            $c2 = cmsf_extract_contacts($h2, cmsf_text($h2));
-            if ($c2['emails'] || $c2['phones']) { $contacts = $c2; break; }
+            if (count($paths) >= 3) break;
         }
     }
-    $rec['email'] = cmsf_best_email($contacts['emails'], $domain);
-    $rec['emails'] = implode('; ', $contacts['emails']);
+    $paths = array_slice(array_values(array_unique(array_merge($paths, [
+        $base . '/contacts', $base . '/contact', $base . '/kontakty'
+    ]))), 0, 5);
+    foreach ($paths as $u) {
+        if ($left() < 7) break;
+        $r2 = cmsf_http_get($u, 4);
+        if (!$r2['ok'] || $r2['body'] === '') continue;
+        $h2 = cmsf_to_utf8($r2['body'], $r2['ctype']);
+        $c2 = cmsf_extract_contacts($h2, cmsf_text($h2));
+        $contacts['emails'] = array_values(array_unique(array_merge($contacts['emails'], $c2['emails'])));
+        $contacts['phones'] = array_values(array_unique(array_merge($contacts['phones'], $c2['phones'])));
+    }
+    $rec['email'] = implode(', ', $contacts['emails']);
+    $rec['emails'] = implode(', ', $contacts['emails']);
     $rec['phone'] = implode('; ', $contacts['phones']);
     $rec['state'] = 'ok';
     return $rec;

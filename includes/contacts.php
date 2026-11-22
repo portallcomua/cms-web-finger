@@ -28,6 +28,25 @@ function cmsfc_table($name) {
     return $wpdb->prefix . 'cmsfc_' . $name;
 }
 
+/**
+ * Mirror all contacts collected by the crawler into the main site record.
+ * This keeps the main list's email column comma-separated and shared across lists.
+ */
+function cmsfc_sync_site_emails_to_finder($domain, $emails) {
+    global $wpdb;
+    if (!function_exists('cmsf_t')) return false;
+    $domain = function_exists('cmsf_norm_domain') ? cmsf_norm_domain($domain) : sanitize_text_field($domain);
+    if (!$domain || !is_array($emails)) return false;
+    $clean = [];
+    foreach ($emails as $email) {
+        $email = strtolower(sanitize_email(trim((string)$email)));
+        if (is_email($email) && !cmsf_contact_is_blocked($email)) $clean[$email] = $email;
+    }
+    if (!$clean) return 0;
+    $value = implode(', ', array_values($clean));
+    return $wpdb->update(cmsf_t('sites'), ['email' => $value, 'emails' => $value], ['domain' => $domain]);
+}
+
 /* ---------------------------------------------------------
  * 2. Створення таблиць бази даних
  * --------------------------------------------------------- */
@@ -560,6 +579,13 @@ function cmsfc_scan_step($list_id) {
             $list_id
         )
     );
+
+    // Keep the main Finder list in sync with every address collected by the crawler.
+    $all_emails = $wpdb->get_col($wpdb->prepare(
+        "SELECT email FROM " . cmsfc_table('contacts') . " WHERE list_id=%d ORDER BY email ASC",
+        $list_id
+    ));
+    cmsfc_sync_site_emails_to_finder($list['domain'], $all_emails);
 
     $done = empty($queue) || (int)$list['pages_done'] >= (int)$list['max_pages'];
 
@@ -1288,7 +1314,9 @@ function cmsfc_admin_page() {
 
             <p id="cmsfc-email-info">Виберіть список, щоб переглянути його адреси.</p>
 
-            <div class="cmsfc-table-wrap">
+            <details class="cmsfc-email-details">
+                <summary>Розгорнути список email</summary>
+                <div class="cmsfc-table-wrap">
                 <table class="widefat striped" id="cmsfc-email-table">
                     <thead>
                         <tr>
@@ -1303,7 +1331,8 @@ function cmsfc_admin_page() {
                         <tr><td colspan="5">Адреси ще не завантажені.</td></tr>
                     </tbody>
                 </table>
-            </div>
+                </div>
+            </details>
 
             <div class="cmsfc-actions">
                 <button type="button" class="button" id="cmsfc-email-prev">← Назад</button>

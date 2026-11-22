@@ -60,9 +60,14 @@ function cmsf_filters_from_post() {
         'state' => in_array(cmsf_post('state', 'ok'), ['ok', 'queued', 'rejected', 'failed', 'all'], true) ? cmsf_post('state', 'ok') : 'ok',
         'q' => sanitize_text_field(cmsf_post('q')),
         'has_email' => !empty($_POST['has_email']) ? 1 : 0,
+        'notes' => in_array(cmsf_post('notes'), ['with', 'without'], true) ? cmsf_post('notes') : '',
+        'order_by' => in_array(cmsf_post('order_by'), ['domain','cms','version','country','language','email','phone','note','sent_at'], true) ? cmsf_post('order_by') : 'id',
+        'order_dir' => strtoupper(cmsf_post('order_dir')) === 'ASC' ? 'ASC' : 'DESC',
         'sent' => in_array(cmsf_post('sent'), ['unsent', 'sent', 'failed'], true) ? cmsf_post('sent') : '',
         'outdated' => !empty($_POST['outdated']) ? 1 : 0,
         'cms' => sanitize_text_field(cmsf_post('cms_filter')),
+        'version_min' => preg_replace('/[^0-9.]/', '', (string)cmsf_post('version_min')),
+        'version_max' => preg_replace('/[^0-9.]/', '', (string)cmsf_post('version_max')),
     ];
 }
 
@@ -79,11 +84,30 @@ function cmsf_where($list_id, $f) {
         array_push($a, $like, $like, $like, $like);
     }
     if (!empty($f['has_email'])) $w[] = "email<>''";
+    if (($f['notes'] ?? '') === 'with') $w[] = "note<>''";
+    if (($f['notes'] ?? '') === 'without') $w[] = "(note IS NULL OR note='')";
     if (($f['sent'] ?? '') === 'unsent') $w[] = 'sent_at IS NULL';
     if (($f['sent'] ?? '') === 'sent') $w[] = 'send_ok=1';
     if (($f['sent'] ?? '') === 'failed') $w[] = 'send_ok=0';
     if (!empty($f['outdated'])) $w[] = 'outdated=1';
     if (!empty($f['cms'])) { $w[] = 'cms=%s'; $a[] = $f['cms']; }
+    // Numeric semantic version key: major * 1,000,000 + minor * 1,000 + patch.
+    $version_key = "(
+        CAST(SUBSTRING_INDEX(version,'.',1) AS UNSIGNED) * 1000000 +
+        CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',2),'.',-1) AS UNSIGNED) * 1000 +
+        CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',3),'.',-1) AS UNSIGNED)
+    )";
+    $has_version_bound = false;
+    foreach (['version_min' => '>=', 'version_max' => '<='] as $key => $op) {
+        if (!empty($f[$key]) && preg_match('/^\\d+(?:\\.\\d+){0,2}$/', $f[$key])) {
+            $parts = array_map('intval', explode('.', $f[$key]));
+            $bound = ($parts[0] ?? 0) * 1000000 + ($parts[1] ?? 0) * 1000 + ($parts[2] ?? 0);
+            $w[] = "$version_key $op %d";
+            $a[] = $bound;
+            $has_version_bound = true;
+        }
+    }
+    if ($has_version_bound) $w[] = "version<>''";
     return [implode(' AND ', $w), $a];
 }
 
@@ -132,9 +156,36 @@ cmsf_ajax('rows', function () {
     list($where, $args) = cmsf_where($id, cmsf_filters_from_post());
     $t = cmsf_t('sites');
     $total = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $t WHERE $where", $args));
-    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    $filters = cmsf_filters_from_post();
+    $allowed_sort = ['domain','cms','version','country','language','email','phone','note','sent_at','id'];
+    $sort = in_array($filters['order_by'], $allowed_sort, true) ? $filters['order_by'] : 'id';
+    $dir = $filters['order_dir'] === 'ASC' ? 'ASC' : 'DESC';
+    $sort_sql = $sort === 'version'
+        ? "(CAST(SUBSTRING_INDEX(version,'.',1) AS UNSIGNED) * 1000000 + CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',2),'.',-1) AS UNSIGNED) * 1000 + CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',3),'.',-1) AS UNSIGNED))"
+        : "`$sort`";
+    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY $sort_sql $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    // Show where a repeated domain is already stored; notes remain shared across these lists.
+    $membership = [];
+    $domains = array_values(array_unique(array_filter(array_column($rows, 'domain'))));
+    if ($domains) {
+        $marks = implode(',', array_fill(0, count($domains), '%s'));
+        $members = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.domain, GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ', ') AS list_names, COUNT(DISTINCT l.id) AS list_count
+             FROM $t s INNER JOIN " . cmsf_t('lists') . " l ON l.id=s.list_id
+             WHERE s.domain IN ($marks) GROUP BY s.domain",
+            $domains
+        ), ARRAY_A);
+        foreach ($members as $member) $membership[$member['domain']] = $member;
+    }
+    $out_rows = [];
+    foreach ($rows as $row) {
+        $out = cmsf_row_out($row);
+        $out['list_names'] = $membership[$row['domain']]['list_names'] ?? '';
+        $out['list_count'] = (int)($membership[$row['domain']]['list_count'] ?? 1);
+        $out_rows[] = $out;
+    }
     $cms_list = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT cms FROM $t WHERE list_id=%d AND state='ok' AND cms<>'' ORDER BY cms", $id));
-    wp_send_json_success(['rows' => array_map('cmsf_row_out', $rows), 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list]);
+    wp_send_json_success(['rows' => $out_rows, 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list, 'note_suggestions' => array_slice((array)get_option('cmsf_note_history', []), 0, 30)]);
 });
 
 cmsf_ajax('ids', function () {
@@ -149,13 +200,22 @@ cmsf_ajax('row_update', function () {
     $id = (int)cmsf_post('id');
     $field = cmsf_post('field');
     $val = cmsf_post('value');
-    if ($field === 'note') $data = ['note' => sanitize_textarea_field($val)];
-    elseif ($field === 'email') {
-        $e = sanitize_email($val);
-        if ($val !== '' && !is_email($e)) wp_send_json_error('Некоректний email');
-        $data = ['email' => $e];
+    $site = cmsf_site_row($id);
+    if (!$site) wp_send_json_error('Сайт не знайдено');
+    if ($field === 'note') {
+        $note = cmsf_note_save($id, $val);
+        if ($note === false) wp_send_json_error('Не вдалося зберегти нотатку');
+    } elseif ($field === 'email') {
+        $parts = preg_split('/[,;\s]+/', (string)$val, -1, PREG_SPLIT_NO_EMPTY);
+        $emails = [];
+        foreach ($parts as $part) {
+            $e = strtolower(sanitize_email(trim($part)));
+            if (!is_email($e)) wp_send_json_error('Некоректна email-адреса: ' . sanitize_text_field($part));
+            $emails[$e] = $e;
+        }
+        $data = ['email' => implode(', ', array_values($emails))];
+        $wpdb->update(cmsf_t('sites'), $data, ['id' => $id]);
     } else wp_send_json_error('Невідоме поле');
-    $wpdb->update(cmsf_t('sites'), $data, ['id' => $id]);
     wp_send_json_success();
 });
 
@@ -376,9 +436,9 @@ cmsf_ajax('save_settings', function () {
 });
 
 cmsf_ajax('refresh_latest', function () {
-    delete_transient('cmsf_latest_cache');
+    delete_transient('cmsf_latest_cache_v2');
     $c = cmsf_fetch_latest();
-    set_transient('cmsf_latest_cache', $c, array_filter($c) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
+    set_transient('cmsf_latest_cache_v2', $c, array_filter($c) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
     wp_send_json_success($c);
 });
 

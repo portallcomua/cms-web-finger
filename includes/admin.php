@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 
 add_action('admin_menu', function () {
-    add_menu_page('CMS Web Finder', 'CMS Web Finder', 'manage_options', 'cms-checker', 'cmsf_page_search', 'dashicons-search', 30);
+    add_menu_page('UA Web Finder', 'UA Web Finder', 'manage_options', 'cms-checker', 'cmsf_page_search', 'dashicons-search', 30);
     add_submenu_page('cms-checker', 'Пошук сайтів', 'Пошук', 'manage_options', 'cms-checker', 'cmsf_page_search');
     add_submenu_page('cms-checker', 'Свій список доменів', 'Свій список', 'manage_options', 'cmsf-import', 'cmsf_page_import');
     add_submenu_page('cms-checker', 'Збережені списки', 'Списки', 'manage_options', 'cmsf-lists', 'cmsf_page_lists');
@@ -14,7 +14,9 @@ add_action('admin_enqueue_scripts', function () {
     $page = $_GET['page'] ?? '';
     if (!in_array($page, ['cms-checker', 'cmsf-import', 'cmsf-lists', 'cmsf-templates', 'cmsf-settings'], true)) return;
     wp_enqueue_style('cmsf-admin', CMSF_URL . 'assets/admin.css', [], CMSF_VERSION);
-    wp_enqueue_script('cmsf-admin', CMSF_URL . 'assets/admin.js', [], CMSF_VERSION, true);
+    if ($page === 'cmsf-templates') wp_enqueue_editor();
+    $admin_deps = $page === 'cmsf-templates' ? ['wp-editor'] : [];
+    wp_enqueue_script('cmsf-admin', CMSF_URL . 'assets/admin.js', $admin_deps, CMSF_VERSION, true);
     $s = cmsf_settings();
     wp_localize_script('cmsf-admin', 'CMSF', [
         'ajax' => admin_url('admin-ajax.php'),
@@ -43,7 +45,7 @@ function cmsf_page_search() {
     $platforms = array_combine(cmsf_platforms(), cmsf_platforms());
     ?>
     <div class="wrap cmsf" data-page="search">
-        <h1>CMS Web Finder — пошук сайтів</h1>
+        <h1>UA Web Finder — пошук сайтів</h1>
         <div class="cmsf-card">
             <div class="cmsf-presets">
                 <label><span>Шаблон пошуку (збережені параметри)</span><select id="cmsf-preset"><option value="">— обрати збережений шаблон —</option></select></label>
@@ -183,8 +185,8 @@ function cmsf_page_templates() {
                         <label><span>Назва шаблону</span><input type="text" name="name" required></label>
                         <label><span>Тема (група)</span><input type="text" name="topic" list="cmsf-topics" placeholder="Joomla, WordPress, Плагіни…"><datalist id="cmsf-topics"></datalist></label>
                         <label class="cmsf-wide"><span>Тема листа (Subject)</span><input type="text" name="subject"></label>
-                        <label class="cmsf-wide"><span>Текст листа</span><textarea name="body" rows="12"></textarea></label>
-                        <label class="cmsf-wide cmsf-check"><input type="checkbox" name="is_html" value="1"> Надсилати як HTML (інакше — звичайний текст)</label>
+                        <div class="cmsf-wide"><label for="cmsf_tpl_body">Текст листа</label><?php wp_editor('', 'cmsf_tpl_body', ['textarea_name' => 'body', 'textarea_rows' => 12, 'media_buttons' => false, 'teeny' => false, 'tinymce' => true, 'quicktags' => true]); ?></div>
+                        <fieldset class="cmsf-wide"><legend>Формат листа</legend><label><input type="radio" name="is_html" value="0" checked> Звичайний текст</label><label><input type="radio" name="is_html" value="1"> HTML</label></fieldset>
                     </div>
                     <p class="description">Змінні: <code>{url}</code> <code>{domain}</code> <code>{site_title}</code> <code>{cms}</code> <code>{version}</code> <code>{latest_version}</code> <code>{email}</code></p>
                     <div class="cmsf-actions">

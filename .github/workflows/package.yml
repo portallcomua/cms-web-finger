@@ -1,0 +1,38 @@
+name: Build WordPress update package
+
+on:
+  push:
+    branches:
+      - feature/2.4.0-ua-improvements
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assemble package matching the existing cms-web-finder installation
+        run: |
+          mkdir -p package/cms-web-finder
+          cp cms-web-finder.php package/cms-web-finder/cms-web-finder.php
+          cp -R includes assets README.md package/cms-web-finder/
+          cd package
+          zip -r ../ua-web-finder.zip cms-web-finder
+      - name: Upload update ZIP
+        uses: actions/upload-artifact@v6
+        with:
+          name: ua-web-finder-update
+          path: ua-web-finder.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish tagged WordPress release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ua-web-finder.zip
+          generate_release_notes: true
