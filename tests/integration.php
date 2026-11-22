@@ -29,7 +29,7 @@ $plain_id = cmsf_template_save(0, [
     'is_html' => 0,
 ]);
 $plain = cmsf_template_get($plain_id);
-if (!$plain || strpos($plain['body'], '<') !== false || strpos($plain['body'], "\\n") === false) {
+if (!$plain || strpos($plain['body'], '<') !== false || strpos($plain['body'], "\n") === false) {
     $fail('Rich editor plain-text conversion failed');
 }
 $html_id = cmsf_template_save(0, [
