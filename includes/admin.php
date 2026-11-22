@@ -14,8 +14,9 @@ add_action('admin_enqueue_scripts', function () {
     $page = $_GET['page'] ?? '';
     if (!in_array($page, ['cms-checker', 'cmsf-import', 'cmsf-lists', 'cmsf-templates', 'cmsf-settings'], true)) return;
     wp_enqueue_style('cmsf-admin', CMSF_URL . 'assets/admin.css', [], CMSF_VERSION);
-    wp_enqueue_script('cmsf-admin', CMSF_URL . 'assets/admin.js', [], CMSF_VERSION, true);
     if ($page === 'cmsf-templates') wp_enqueue_editor();
+    $admin_deps = $page === 'cmsf-templates' ? ['wp-editor'] : [];
+    wp_enqueue_script('cmsf-admin', CMSF_URL . 'assets/admin.js', $admin_deps, CMSF_VERSION, true);
     $s = cmsf_settings();
     wp_localize_script('cmsf-admin', 'CMSF', [
         'ajax' => admin_url('admin-ajax.php'),
