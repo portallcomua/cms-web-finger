@@ -5,7 +5,7 @@ Plugin Name: UA Web Finder
 Description: Пошук сайтів за CMS, збір контактів із публічних сторінок, списки, кампанії та керування відписками.
 Version: 2.4.1
 Author: UAServer
-Text Domain: cms-checker
+Text Domain: ua-web-finder
 */
 
 if (!defined('ABSPATH')) {
@@ -149,7 +149,7 @@ add_action('plugins_loaded', function () {
  * Publishes updates only when a GitHub Release exists for this repository.
  */
 function cmsf_github_release_info($force = false) {
-    $cached = get_transient('cmsf_github_release_v1');
+    $cached = get_transient('cmsf_github_release_v2');
     if (!$force && is_array($cached)) return $cached;
 
     $response = wp_remote_get('https://api.github.com/repos/portallcomua/cms-web-finger/releases/latest', [
@@ -184,7 +184,7 @@ function cmsf_github_release_info($force = false) {
         'tested' => '6.8',
         'requires_php' => '7.4',
     ];
-    set_transient('cmsf_github_release_v1', $data, 6 * HOUR_IN_SECONDS);
+    set_transient('cmsf_github_release_v2', $data, 6 * HOUR_IN_SECONDS);
     return $data;
 }
 
@@ -198,7 +198,7 @@ add_filter('pre_set_site_transient_update_plugins', function ($transient) {
     if (version_compare($release['version'], CMSF_VERSION, '<=')) return $transient;
 
     $transient->response[$plugin_file] = (object)[
-        'slug' => 'cms-checker',
+        'slug' => 'cms-web-finder',
         'plugin' => $plugin_file,
         'new_version' => $release['version'],
         'url' => $release['url'],
@@ -211,7 +211,7 @@ add_filter('pre_set_site_transient_update_plugins', function ($transient) {
 });
 
 add_filter('plugins_api', function ($result, $action, $args) {
-    if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== 'cms-checker') return $result;
+    if ($action !== 'plugin_information' || empty($args->slug) || $args->slug !== 'cms-web-finder') return $result;
     $release = cmsf_github_release_info();
     if (empty($release['version'])) return $result;
     return (object)[
