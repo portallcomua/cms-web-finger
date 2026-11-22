@@ -4,6 +4,8 @@
 Plugin Name: UA Web Finder
 Description: Пошук сайтів за CMS, збір контактів із публічних сторінок, списки, кампанії та керування відписками.
 Version: 2.5.0
+Requires at least: 5.8
+Requires PHP: 7.4
 Author: UAServer
 Text Domain: ua-web-finder
 */
