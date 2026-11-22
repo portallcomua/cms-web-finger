@@ -225,9 +225,8 @@ function cmsf_add_queued($list_id, $domains) {
     foreach (array_unique($domains) as $d) {
         $d = cmsf_norm_domain($d);
         if (!$d || strpos($d, '.') === false) continue;
-        // Не створюємо повторний запис домену, якщо він уже є в будь-якому списку.
-        $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM $t WHERE domain=%s LIMIT 1", $d));
-        if ($exists) continue;
+        // Один домен може входити до кількох списків. У межах поточного
+        // списку повтори відсікає UNIQUE KEY (list_id, domain) та INSERT IGNORE.
         $values[] = $wpdb->prepare("(%d,%s,%s,'queued')", $list_id, $d, 'https://' . $d);
     }
     $added = 0;
