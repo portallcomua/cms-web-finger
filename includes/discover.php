@@ -31,8 +31,8 @@ function cmsf_make_queries($p) {
     $any = !$langs || in_array('any', $langs, true);
 
     $fp = [
-        'WordPress' => ['inurl:"wp-content/plugins"', 'inurl:"wp-content/themes"'],
-        'Joomla' => ['inurl:"option=com_content"', 'inurl:"index.php/component"'],
+        'WordPress' => ['inurl:"wp-content/plugins"', 'inurl:"wp-content/themes"', 'inurl:"wp-json"', 'inurl:"wp-content/uploads"'],
+        'Joomla' => ['inurl:"option=com_content"', 'inurl:"index.php/component"', 'inurl:"/media/system/js/"', 'inurl:"/components/com_content/"'],
         'Drupal' => ['"drupalSettings"', 'inurl:"sites/default/files"'],
         'OpenCart' => ['inurl:"route=product/product"'],
         'PrestaShop' => ['inurl:"controller=product"'],
