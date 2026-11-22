@@ -200,20 +200,8 @@ cmsf_ajax('row_update', function () {
     $site = cmsf_site_row($id);
     if (!$site) wp_send_json_error('Сайт не знайдено');
     if ($field === 'note') {
-        $note = sanitize_textarea_field($val);
-        if ($note !== '' && $note !== (string)$site['note']) {
-            $note = preg_replace('/^\[\d{2}\.\d{2}\.\d{4}(?: \d{2}:\d{2})?\]\s*/', '', $note);
-            $note = '[' . wp_date('d.m.Y H:i') . '] ' . $note;
-        }
-        // Нотатка спільна для всіх входжень домену в різних списках.
-        $wpdb->update(cmsf_t('sites'), ['note' => $note], ['domain' => $site['domain']]);
-        if ($note !== '') {
-            $history = get_option('cmsf_note_history', []);
-            if (!is_array($history)) $history = [];
-            $plain = preg_replace('/^\[\d{2}\.\d{2}\.\d{4}(?: \d{2}:\d{2})?\]\s*/', '', $note);
-            $history = array_values(array_unique(array_slice(array_merge([$plain], $history), 0, 30)));
-            update_option('cmsf_note_history', $history, false);
-        }
+        $note = cmsf_note_save($id, $val);
+        if ($note === false) wp_send_json_error('Не вдалося зберегти нотатку');
     } elseif ($field === 'email') {
         $parts = preg_split('/[,;\s]+/', (string)$val, -1, PREG_SPLIT_NO_EMPTY);
         $emails = [];
