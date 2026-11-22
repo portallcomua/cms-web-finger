@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - feature/2.4.0-ua-improvements
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   package:
@@ -25,3 +30,9 @@ jobs:
           path: ua-web-finder.zip
           if-no-files-found: error
           retention-days: 30
+      - name: Publish tagged WordPress release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ua-web-finder.zip
+          generate_release_notes: true
