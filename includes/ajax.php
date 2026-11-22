@@ -160,7 +160,10 @@ cmsf_ajax('rows', function () {
     $allowed_sort = ['domain','cms','version','country','language','email','phone','note','sent_at','id'];
     $sort = in_array($filters['order_by'], $allowed_sort, true) ? $filters['order_by'] : 'id';
     $dir = $filters['order_dir'] === 'ASC' ? 'ASC' : 'DESC';
-    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY `$sort` $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    $sort_sql = $sort === 'version'
+        ? "(CAST(SUBSTRING_INDEX(version,'.',1) AS UNSIGNED) * 1000000 + CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',2),'.',-1) AS UNSIGNED) * 1000 + CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',3),'.',-1) AS UNSIGNED))"
+        : "`$sort`";
+    $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY $sort_sql $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
     // Show where a repeated domain is already stored; notes remain shared across these lists.
     $membership = [];
     $domains = array_values(array_unique(array_filter(array_column($rows, 'domain'))));
