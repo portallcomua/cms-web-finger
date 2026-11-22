@@ -97,14 +97,17 @@ function cmsf_where($list_id, $f) {
         CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',2),'.',-1) AS UNSIGNED) * 1000 +
         CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(CONCAT(version,'.0.0'),'.',3),'.',-1) AS UNSIGNED)
     )";
+    $has_version_bound = false;
     foreach (['version_min' => '>=', 'version_max' => '<='] as $key => $op) {
         if (!empty($f[$key]) && preg_match('/^\\d+(?:\\.\\d+){0,2}$/', $f[$key])) {
             $parts = array_map('intval', explode('.', $f[$key]));
             $bound = ($parts[0] ?? 0) * 1000000 + ($parts[1] ?? 0) * 1000 + ($parts[2] ?? 0);
             $w[] = "$version_key $op %d";
             $a[] = $bound;
+            $has_version_bound = true;
         }
     }
+    if ($has_version_bound) $w[] = "version<>''";
     return [implode(' AND ', $w), $a];
 }
 
