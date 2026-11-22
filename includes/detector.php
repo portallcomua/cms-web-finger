@@ -427,26 +427,34 @@ function cmsf_inspect($domain, $params) {
         $rec['latest'] = cmsf_latest($cms);
         $rec['outdated'] = cmsf_is_outdated($rec['version'], $rec['latest']) ? 1 : 0;
     }
-    if (!$contacts['emails'] && !$contacts['phones']) {
-        $paths = [];
-        if (preg_match_all('#<a\b[^>]*href=["\']([^"\'\#]+)["\'][^>]*>(.*?)</a>#is', $html, $mm, PREG_SET_ORDER)) {
-            foreach ($mm as $a) {
-                if (preg_match('/contact|контакт|зв\'яз|про нас|about/iu', wp_strip_all_tags($a[2]) . ' ' . $a[1])) {
-                    $href = $a[1];
-                    if (preg_match('#^https?://#i', $href)) { if (cmsf_norm_domain($href) !== $domain) continue; $paths[] = $href; }
-                    elseif (strpos($href, '//') !== 0 && strpos($href, 'mailto:') !== 0 && strpos($href, 'tel:') !== 0 && strpos($href, 'javascript:') !== 0) $paths[] = $base . '/' . ltrim($href, '/');
-                    break;
-                }
+    // Додатково перевіряємо сторінки контактів навіть тоді, коли email є на
+    // головній: різні адреси (відділи продажу, підтримка, бухгалтерія) часто
+    // розміщені на різних сторінках. Обмежуємо кількість URL і час запитів.
+    $paths = [];
+    if (preg_match_all('#<a\b[^>]*href=["\']([^"\'\#]+)["\'][^>]*>(.*?)</a>#is', $html, $mm, PREG_SET_ORDER)) {
+        foreach ($mm as $a) {
+            if (!preg_match('/contact|контакт|зв\'яз|про нас|about/iu', wp_strip_all_tags($a[2]) . ' ' . $a[1])) continue;
+            $href = html_entity_decode($a[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (preg_match('#^https?://#i', $href)) {
+                if (cmsf_norm_domain($href) !== $domain) continue;
+                $paths[] = $href;
+            } elseif (strpos($href, '//') !== 0 && strpos($href, 'mailto:') !== 0 && strpos($href, 'tel:') !== 0 && strpos($href, 'javascript:') !== 0) {
+                $paths[] = $base . '/' . ltrim($href, '/');
             }
+            if (count($paths) >= 3) break;
         }
-        foreach (array_merge($paths, [$base . '/contacts', $base . '/contact', $base . '/kontakty']) as $u) {
-            if ($left() < 7) break;
-            $r2 = cmsf_http_get($u, 5);
-            if (!$r2['ok'] || $r2['body'] === '') continue;
-            $h2 = cmsf_to_utf8($r2['body'], $r2['ctype']);
-            $c2 = cmsf_extract_contacts($h2, cmsf_text($h2));
-            if ($c2['emails'] || $c2['phones']) { $contacts = $c2; break; }
-        }
+    }
+    $paths = array_slice(array_values(array_unique(array_merge($paths, [
+        $base . '/contacts', $base . '/contact', $base . '/kontakty'
+    ]))), 0, 5);
+    foreach ($paths as $u) {
+        if ($left() < 7) break;
+        $r2 = cmsf_http_get($u, 4);
+        if (!$r2['ok'] || $r2['body'] === '') continue;
+        $h2 = cmsf_to_utf8($r2['body'], $r2['ctype']);
+        $c2 = cmsf_extract_contacts($h2, cmsf_text($h2));
+        $contacts['emails'] = array_values(array_unique(array_merge($contacts['emails'], $c2['emails'])));
+        $contacts['phones'] = array_values(array_unique(array_merge($contacts['phones'], $c2['phones'])));
     }
     $rec['email'] = implode(', ', $contacts['emails']);
     $rec['emails'] = implode(', ', $contacts['emails']);
