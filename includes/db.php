@@ -217,6 +217,37 @@ function cmsf_list_delete($id) {
     $wpdb->delete(cmsf_t('lists'), ['id' => $id]);
 }
 
+/**
+ * Save one domain note to every occurrence of that domain across all lists.
+ * Returns the saved note or false when the site ID does not exist.
+ */
+function cmsf_note_save($site_id, $value) {
+    global $wpdb;
+    $site = $wpdb->get_row(
+        $wpdb->prepare("SELECT domain, note FROM " . cmsf_t('sites') . " WHERE id=%d", (int)$site_id),
+        ARRAY_A
+    );
+    if (!$site) return false;
+
+    $note = sanitize_textarea_field((string)$value);
+    if ($note !== '' && $note !== (string)$site['note']) {
+        $note = preg_replace('/^\\[\\d{2}\\.\\d{2}\\.\\d{4}(?: \\d{2}:\\d{2})?\\]\\s*/', '', $note);
+        $note = '[' . wp_date('d.m.Y H:i') . '] ' . $note;
+    }
+
+    $updated = $wpdb->update(cmsf_t('sites'), ['note' => $note], ['domain' => $site['domain']]);
+    if ($updated === false) return false;
+
+    if ($note !== '') {
+        $history = get_option('cmsf_note_history', []);
+        if (!is_array($history)) $history = [];
+        $plain = preg_replace('/^\\[\\d{2}\\.\\d{2}\\.\\d{4}(?: \\d{2}:\\d{2})?\\]\\s*/', '', $note);
+        $history = array_values(array_unique(array_slice(array_merge([$plain], $history), 0, 30)));
+        update_option('cmsf_note_history', $history, false);
+    }
+    return $note;
+}
+
 // Додає домени в чергу списку. Повертає кількість нових.
 function cmsf_add_queued($list_id, $domains) {
     global $wpdb;
