@@ -15,6 +15,7 @@ add_action('admin_enqueue_scripts', function () {
     if (!in_array($page, ['cms-checker', 'cmsf-import', 'cmsf-lists', 'cmsf-templates', 'cmsf-settings'], true)) return;
     wp_enqueue_style('cmsf-admin', CMSF_URL . 'assets/admin.css', [], CMSF_VERSION);
     wp_enqueue_script('cmsf-admin', CMSF_URL . 'assets/admin.js', [], CMSF_VERSION, true);
+    if ($page === 'cmsf-templates') wp_enqueue_editor();
     $s = cmsf_settings();
     wp_localize_script('cmsf-admin', 'CMSF', [
         'ajax' => admin_url('admin-ajax.php'),
@@ -183,7 +184,7 @@ function cmsf_page_templates() {
                         <label><span>Назва шаблону</span><input type="text" name="name" required></label>
                         <label><span>Тема (група)</span><input type="text" name="topic" list="cmsf-topics" placeholder="Joomla, WordPress, Плагіни…"><datalist id="cmsf-topics"></datalist></label>
                         <label class="cmsf-wide"><span>Тема листа (Subject)</span><input type="text" name="subject"></label>
-                        <label class="cmsf-wide"><span>Текст листа</span><textarea name="body" rows="12"></textarea></label>
+                        <div class="cmsf-wide"><label for="cmsf_tpl_body">Текст листа</label><?php wp_editor('', 'cmsf_tpl_body', ['textarea_name' => 'body', 'textarea_rows' => 12, 'media_buttons' => false, 'teeny' => false, 'tinymce' => true, 'quicktags' => true]); ?></div>
                         <fieldset class="cmsf-wide"><legend>Формат листа</legend><label><input type="radio" name="is_html" value="0" checked> Звичайний текст</label><label><input type="radio" name="is_html" value="1"> HTML</label></fieldset>
                     </div>
                     <p class="description">Змінні: <code>{url}</code> <code>{domain}</code> <code>{site_title}</code> <code>{cms}</code> <code>{version}</code> <code>{latest_version}</code> <code>{email}</code></p>
