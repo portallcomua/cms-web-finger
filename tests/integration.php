@@ -21,6 +21,28 @@ if (!$legacy || strpos((string)$legacy['note'], 'legacy note') === false) {
 if (!cmsf_templates_all()) {
     $fail('Template table was not seeded/migrated');
 }
+$plain_id = cmsf_template_save(0, [
+    'name' => 'Plain editor test',
+    'topic' => 'CI',
+    'subject' => 'Test',
+    'body' => '<p>Hello</p><p>World</p>',
+    'is_html' => 0,
+]);
+$plain = cmsf_template_get($plain_id);
+if (!$plain || strpos($plain['body'], '<') !== false || strpos($plain['body'], "\\n") === false) {
+    $fail('Rich editor plain-text conversion failed');
+}
+$html_id = cmsf_template_save(0, [
+    'name' => 'HTML editor test',
+    'topic' => 'CI',
+    'subject' => 'Test',
+    'body' => '<p>Safe</p><script>alert(1)</script>',
+    'is_html' => 1,
+]);
+$html = cmsf_template_get($html_id);
+if (!$html || strpos($html['body'], '<script') !== false || strpos($html['body'], '<p>Safe</p>') === false) {
+    $fail('HTML editor sanitization failed');
+}
 
 $list_a = cmsf_list_create('Integration A', []);
 $list_b = cmsf_list_create('Integration B', []);
