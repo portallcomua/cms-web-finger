@@ -216,7 +216,7 @@ add_filter('plugins_api', function ($result, $action, $args) {
     if (empty($release['version'])) return $result;
     return (object)[
         'name' => 'UA Web Finder',
-        'slug' => 'cms-checker',
+        'slug' => 'cms-web-finder',
         'version' => $release['version'],
         'author' => 'UAServer',
         'homepage' => 'https://github.com/portallcomua/cms-web-finger',
