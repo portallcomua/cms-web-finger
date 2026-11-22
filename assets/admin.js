@@ -201,7 +201,19 @@
     }));
     q('.p-prev').onclick = () => load(S.page - 1);
     q('.p-next').onclick = () => load(S.page + 1);
+    const autosaveTimers = new WeakMap();
+    tbody.addEventListener('input', e => {
+      if (!e.target.classList.contains('inp-note') && !e.target.classList.contains('inp-email')) return;
+      clearTimeout(autosaveTimers.get(e.target));
+      autosaveTimers.set(e.target, setTimeout(() => {
+        e.target.dispatchEvent(new Event('change', { bubbles: true }));
+      }, 900));
+    });
     tbody.addEventListener('change', e => {
+      if (autosaveTimers.has(e.target)) {
+        clearTimeout(autosaveTimers.get(e.target));
+        autosaveTimers.delete(e.target);
+      }
       const tr = e.target.closest('tr'); if (!tr) return;
       const id = Number(tr.dataset.id);
       if (e.target.classList.contains('row-sel')) { e.target.checked ? S.sel.add(id) : S.sel.delete(id); renderSel(); }
