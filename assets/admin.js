@@ -544,10 +544,10 @@
     const form = $('#cmsf-tpl-form'), msg = $('#cmsf-tpl-msg');
     let tpls = [];
     const say = (t, bad) => { msg.textContent = t; msg.className = 'cmsf-msg' + (bad ? ' cmsf-bad' : ''); };
-    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: form.elements.body.value, is_html: form.querySelector('input[name="is_html"]:checked').value === '1' ? 1 : 0 });
+    const get = () => ({ id: form.elements.id.value, name: form.elements.name.value, topic: form.elements.topic.value, subject: form.elements.subject.value, body: (window.tinymce && window.tinymce.get('cmsf_tpl_body')) ? window.tinymce.get('cmsf_tpl_body').getContent() : form.elements.body.value, is_html: form.querySelector('input[name="is_html"]:checked').value === '1' ? 1 : 0 });
     function fill(t) {
       form.elements.id.value = t ? t.id : 0; form.elements.name.value = t ? t.name : ''; form.elements.topic.value = t ? t.topic : '';
-      form.elements.subject.value = t ? t.subject : ''; form.elements.body.value = t ? t.body : ''; Array.from(form.querySelectorAll('input[name="is_html"]')).forEach(r => { r.checked = r.value === (t && Number(t.is_html) ? '1' : '0'); });
+      form.elements.subject.value = t ? t.subject : ''; if (window.tinymce && window.tinymce.get('cmsf_tpl_body')) window.tinymce.get('cmsf_tpl_body').setContent(t ? t.body : ''); else form.elements.body.value = t ? t.body : ''; Array.from(form.querySelectorAll('input[name="is_html"]')).forEach(r => { r.checked = r.value === (t && Number(t.is_html) ? '1' : '0'); });
       $('#cmsf-tpl-prev').hidden = true; say('');
       $$('.cmsf-tpl-item').forEach(i => i.classList.toggle('active', t && i.dataset.id === String(t.id)));
     }
