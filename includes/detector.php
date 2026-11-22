@@ -220,6 +220,12 @@ function cmsf_detect_langs($html, $text) {
     $set = [];
     if (preg_match('/<html[^>]*\blang=["\']?([a-zA-Z-]+)/i', $html, $m)) $set[] = strtolower(substr($m[1], 0, 2));
     if (preg_match_all('/hreflang=["\']([a-zA-Z-]+)["\']/i', $html, $mm)) foreach ($mm[1] as $x) $set[] = strtolower(substr($x, 0, 2));
+    // Якщо сайт не декларує lang/hreflang, визначаємо мову за текстовими
+    // ознаками. Це дозволяє знаходити україномовні UA-сайти зі старими темами.
+    if (!$set) {
+        $inferred = cmsf_text_lang($text);
+        if ($inferred !== '') $set[] = $inferred;
+    }
     return array_values(array_unique(array_filter($set, function ($x) { return preg_match('/^[a-z]{2}$/', $x); })));
 }
 
