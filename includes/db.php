@@ -260,7 +260,15 @@ function cmsf_template_save($id, $data) {
         'updated_at' => cmsf_now(),
     ];
     if ($row['name'] === '') $row['name'] = 'Без назви';
-    if (!empty($row['is_html'])) $row['body'] = wp_kses_post($row['body']);
+    if (!empty($row['is_html'])) {
+        $row['body'] = wp_kses_post($row['body']);
+    } else {
+        // TinyMCE returns HTML even when the sender chooses plain text.
+        // Convert block boundaries to newlines before stripping markup.
+        $plain = preg_replace('#<br\\s*/?>#i', "\\n", $row['body']);
+        $plain = preg_replace('#</(?:p|div|h[1-6]|li|tr)>#i', "\\n", $plain);
+        $row['body'] = sanitize_textarea_field(html_entity_decode(wp_strip_all_tags($plain), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
     if ($id) {
         $wpdb->update(cmsf_t('templates'), $row, ['id' => $id]);
         return $id;
