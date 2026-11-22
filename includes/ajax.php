@@ -422,9 +422,9 @@ cmsf_ajax('save_settings', function () {
 });
 
 cmsf_ajax('refresh_latest', function () {
-    delete_transient('cmsf_latest_cache');
+    delete_transient('cmsf_latest_cache_v2');
     $c = cmsf_fetch_latest();
-    set_transient('cmsf_latest_cache', $c, array_filter($c) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
+    set_transient('cmsf_latest_cache_v2', $c, array_filter($c) ? 12 * HOUR_IN_SECONDS : HOUR_IN_SECONDS);
     wp_send_json_success($c);
 });
 
