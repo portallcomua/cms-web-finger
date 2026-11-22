@@ -158,8 +158,28 @@ cmsf_ajax('rows', function () {
     $sort = in_array($filters['order_by'], $allowed_sort, true) ? $filters['order_by'] : 'id';
     $dir = $filters['order_dir'] === 'ASC' ? 'ASC' : 'DESC';
     $rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $t WHERE $where ORDER BY `$sort` $dir, id DESC LIMIT %d OFFSET %d", array_merge($args, [$per, ($page - 1) * $per])), ARRAY_A);
+    // Show where a repeated domain is already stored; notes remain shared across these lists.
+    $membership = [];
+    $domains = array_values(array_unique(array_filter(array_column($rows, 'domain'))));
+    if ($domains) {
+        $marks = implode(',', array_fill(0, count($domains), '%s'));
+        $members = $wpdb->get_results($wpdb->prepare(
+            "SELECT s.domain, GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR ', ') AS list_names, COUNT(DISTINCT l.id) AS list_count
+             FROM $t s INNER JOIN " . cmsf_t('lists') . " l ON l.id=s.list_id
+             WHERE s.domain IN ($marks) GROUP BY s.domain",
+            $domains
+        ), ARRAY_A);
+        foreach ($members as $member) $membership[$member['domain']] = $member;
+    }
+    $out_rows = [];
+    foreach ($rows as $row) {
+        $out = cmsf_row_out($row);
+        $out['list_names'] = $membership[$row['domain']]['list_names'] ?? '';
+        $out['list_count'] = (int)($membership[$row['domain']]['list_count'] ?? 1);
+        $out_rows[] = $out;
+    }
     $cms_list = $wpdb->get_col($wpdb->prepare("SELECT DISTINCT cms FROM $t WHERE list_id=%d AND state='ok' AND cms<>'' ORDER BY cms", $id));
-    wp_send_json_success(['rows' => array_map('cmsf_row_out', $rows), 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list, 'note_suggestions' => array_slice((array)get_option('cmsf_note_history', []), 0, 30)]);
+    wp_send_json_success(['rows' => $out_rows, 'total' => $total, 'pages' => max(1, (int)ceil($total / $per)), 'page' => $page, 'stats' => cmsf_list_stats($id), 'cms_list' => $cms_list, 'note_suggestions' => array_slice((array)get_option('cmsf_note_history', []), 0, 30)]);
 });
 
 cmsf_ajax('ids', function () {
