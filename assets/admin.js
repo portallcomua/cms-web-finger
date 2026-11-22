@@ -125,7 +125,7 @@
     function rowHtml(r) {
       const cms = r.cms ? `<b>${esc(r.cms)}</b>${r.version ? ' <span class="cmsf-ver">' + esc(r.version) + '</span>' : ''}${r.outdated ? ' <span class="cmsf-badge" title="Остання версія: ' + esc(r.latest) + '">застаріла</span>' : ''}` : '—';
       const sub = r.state !== 'ok' ? `<div class="cmsf-sub">${esc(STATE[r.state] || r.state)}${r.reject_reason ? ': ' + esc(r.reject_reason) : ''}</div>` : (r.title ? `<div class="cmsf-sub">${esc(r.title)}</div>` : '');
-      const listInfo = Number(r.list_count) > 1 ? `<div class="cmsf-sub">Також у списках: ${esc(r.list_names || '')}</div>` : '';
+      const listInfo = Number(r.list_count) > 1 ? `<div class="cmsf-sub">Збережено у списках: ${esc(r.list_names || '')}</div>` : '';
       return `<tr data-id="${r.id}" class="${S.sel.has(r.id) ? 'is-sel' : ''}">
         <td class="c-sel"><input type="checkbox" class="row-sel" ${S.sel.has(r.id) ? 'checked' : ''}></td>
         <td data-label="Сайт"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.domain)}</a>${sub}${listInfo}</td>
