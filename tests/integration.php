@@ -78,6 +78,22 @@ $notes = $wpdb->get_col(
 if (count($notes) !== 2 || count(array_unique($notes)) !== 1) {
     $fail('Shared notes across lists failed');
 }
+$sync_result = cmsfc_sync_site_emails_to_finder(
+    'shared.example.ua',
+    ['one@example.ua', 'two@example.ua', 'one@example.ua']
+);
+if ($sync_result === false) {
+    $fail('Contact crawler email sync failed');
+}
+$stored_emails = $wpdb->get_col(
+    $wpdb->prepare(
+        'SELECT email FROM ' . cmsf_t('sites') . ' WHERE domain=%s',
+        'shared.example.ua'
+    )
+);
+if (count($stored_emails) !== 2 || count(array_unique($stored_emails)) !== 1 || $stored_emails[0] !== 'one@example.ua, two@example.ua') {
+    $fail('All crawler emails were not mirrored as a comma-separated value');
+}
 
 list($where, $args) = cmsf_where($list_a, [
     'state' => 'all',
