@@ -67,6 +67,8 @@
         <select class="f-state"><option value="ok">Знайдені</option><option value="queued">У черзі</option><option value="rejected">Відхилені</option><option value="failed">Недоступні</option><option value="all">Усі</option></select>
         <select class="f-sent"><option value="">Відправка: усі</option><option value="unsent">Ще не надсилали</option><option value="sent">Надіслано успішно</option><option value="failed">Помилка відправки</option></select>
         <select class="f-cms"><option value="">Усі CMS</option></select>
+        <label><span>Версія від</span><input type="text" class="f-version-min" placeholder="1.5"></label>
+        <label><span>Версія до</span><input type="text" class="f-version-max" placeholder="6.00"></label>
         <label class="cmsf-chk"><input type="checkbox" class="f-email"> Є email</label>
         <select class="f-notes"><option value="">Нотатки: усі</option><option value="with">З нотатками</option><option value="without">Без нотаток</option></select>
         <label class="cmsf-chk"><input type="checkbox" class="f-outdated"> Застаріла версія</label>
@@ -112,7 +114,7 @@
       <div class="cmsf-pager"><button type="button" class="button p-prev">←</button><span class="p-info"></span><button type="button" class="button p-next">→</button></div>`;
     const q = s => $(s, root);
     const tbody = q('tbody');
-    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '', notes: q('.f-notes').value, order_by: S.order_by, order_dir: S.order_dir });
+    const filters = () => ({ state: q('.f-state').value, q: q('.f-q').value.trim(), sent: q('.f-sent').value, cms_filter: q('.f-cms').value, has_email: q('.f-email').checked ? 1 : '', outdated: q('.f-outdated').checked ? 1 : '', notes: q('.f-notes').value, version_min: q('.f-version-min').value.trim(), version_max: q('.f-version-max').value.trim(), order_by: S.order_by, order_dir: S.order_dir });
     const msg = t => { q('.lv-msg').textContent = t || ''; };
 
     function sentCell(r) {
@@ -190,6 +192,7 @@
     let t;
     q('.f-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(1), 350); });
     ['.f-state', '.f-sent', '.f-cms', '.f-email', '.f-outdated', '.f-notes'].forEach(sel => q(sel).addEventListener('change', () => load(1)));
+    ['.f-version-min', '.f-version-max'].forEach(sel => q(sel).addEventListener('change', () => load(1)));
     $$('.cmsf-sort', root).forEach(b => b.addEventListener('click', () => {
       const key = b.dataset.sort;
       S.order_dir = S.order_by === key && S.order_dir === 'ASC' ? 'DESC' : 'ASC';
