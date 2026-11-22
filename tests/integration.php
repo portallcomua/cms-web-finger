@@ -55,9 +55,20 @@ if (cmsf_add_queued($list_b, ['shared.example.ua']) !== 1) {
 
 $wpdb->update(
     cmsf_t('sites'),
-    ['state' => 'ok', 'version' => '5.9.0', 'note' => '[22.11.2026 00:00] shared note'],
+    ['state' => 'ok', 'version' => '5.9.0'],
     ['domain' => 'shared.example.ua']
 );
+$first_site_id = (int)$wpdb->get_var(
+    $wpdb->prepare(
+        'SELECT id FROM ' . cmsf_t('sites') . ' WHERE list_id=%d AND domain=%s',
+        $list_a,
+        'shared.example.ua'
+    )
+);
+$saved_note = cmsf_note_save($first_site_id, 'shared note');
+if ($saved_note === false || strpos($saved_note, 'shared note') === false) {
+    $fail('Shared note save helper failed');
+}
 $notes = $wpdb->get_col(
     $wpdb->prepare(
         'SELECT note FROM ' . cmsf_t('sites') . ' WHERE domain=%s',
